@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Horas Extras</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header y navegación -->
+        <header class="main-header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-clock"></i>
+                    <h1>Gestor de Horas Extras</h1>
+                </div>
+                <nav class="main-nav">
+                    <button class="nav-btn active" data-section="dashboard">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </button>
+                    <button class="nav-btn" data-section="empleados">
+                        <i class="fas fa-users"></i>
+                        <span>Empleados</span>
+                    </button>
+                    <button class="nav-btn" data-section="kanban">
+                        <i class="fas fa-columns"></i>
+                        <span>Panel Kanban</span>
+                    </button>
+                    <button class="nav-btn" data-section="reportes">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reportes</span>
+                    </button>
+                </nav>
+                <div class="header-actions">
+                    <button id="theme-toggle" class="theme-toggle">
+                        <i class="fas fa-moon"></i>
+                        <span>Modo Oscuro</span>
+                    </button>
+                    <div class="user-profile">
+                        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4A6FA5&color=fff&bold=true" alt="Usuario">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Dashboard principal -->
+            <section id="dashboard" class="content-section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-home"></i> Dashboard</h2>
+                    <p>Resumen de horas extras y actividades recientes</p>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #4A6FA5;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Total Empleados</h3>
+                            <p class="stat-value" id="total-employees">24</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #6B8E23;">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Horas Extras Mes</h3>
+                            <p class="stat-value" id="total-overtime">147.5</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #DAA520;">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Pendientes de Aprobación</h3>
+                            <p class="stat-value" id="pending-approvals">8</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #8B4513;">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Total a Pagar</h3>
+                            <p class="stat-value">$<span id="total-pay">7,350</span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráfica arriba -->
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3>Distribución por Departamento</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="departmentChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabla de horas extras recientes (más ancha) -->
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3>Horas Extras Recientes</h3>
+                        <button class="btn btn-primary" id="add-overtime-btn">
+                            <i class="fas fa-plus"></i> Registrar Horas
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Empleado</th>
+                                        <th>Fecha</th>
+                                        <th>Horas</th>
+                                        <th>Motivo</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="overtime-table">
+                                    <!-- Los datos se cargan con JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de empleados -->
+            <section id="empleados" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-users"></i> Gestión de Empleados</h2>
+                    <p>Administra la información de los empleados y sus horas extras</p>
+                </div>
+                
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3>Lista de Empleados</h3>
+                        <button class="btn btn-primary" id="add-employee-btn">
+                            <i class="fas fa-user-plus"></i> Agregar Empleado
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="employee-search" placeholder="Buscar empleado por nombre o departamento...">
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Departamento</th>
+                                        <th>Horas Extras Acumuladas</th>
+                                        <th>Último Registro</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="employees-table">
+                                    <!-- Los datos se cargan con JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de panel Kanban -->
+            <section id="kanban" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-columns"></i> Panel Kanban</h2>
+                    <p>Organiza las solicitudes de horas extras por estado</p>
+                </div>
+                
+                <div class="kanban-container">
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3><i class="fas fa-clipboard-list"></i> Pendientes</h3>
+                            <span class="kanban-count" id="pending-count">0</span>
+                        </div>
+                        <div class="kanban-cards" id="pending-column">
+                            <!-- Tarjetas se añaden dinámicamente -->
+                        </div>
+                        <button class="kanban-add-btn" data-status="pendiente">
+                            <i class="fas fa-plus"></i> Agregar Tarea
+                        </button>
+                    </div>
+                    
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3><i class="fas fa-spinner"></i> En Proceso</h3>
+                            <span class="kanban-count" id="inprogress-count">0</span>
+                        </div>
+                        <div class="kanban-cards" id="inprogress-column">
+                            <!-- Tarjetas se añaden dinámicamente -->
+                        </div>
+                        <button class="kanban-add-btn" data-status="en-proceso">
+                            <i class="fas fa-plus"></i> Agregar Tarea
+                        </button>
+                    </div>
+                    
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3><i class="fas fa-check-circle"></i> Aprobadas</h3>
+                            <span class="kanban-count" id="approved-count">0</span>
+                        </div>
+                        <div class="kanban-cards" id="approved-column">
+                            <!-- Tarjetas se añaden dinámicamente -->
+                        </div>
+                        <button class="kanban-add-btn" data-status="aprobada">
+                            <i class="fas fa-plus"></i> Agregar Tarea
+                        </button>
+                    </div>
+                    
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <h3><i class="fas fa-times-circle"></i> Rechazadas</h3>
+                            <span class="kanban-count" id="rejected-count">0</span>
+                        </div>
+                        <div class="kanban-cards" id="rejected-column">
+                            <!-- Tarjetas se añaden dinámicamente -->
+                        </div>
+                        <button class="kanban-add-btn" data-status="rechazada">
+                            <i class="fas fa-plus"></i> Agregar Tarea
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de reportes -->
+            <section id="reportes" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-bar"></i> Reportes y Análisis</h2>
+                    <p>Visualiza estadísticas y tendencias de horas extras</p>
+                </div>
+                
+                <div class="content-row">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Horas Extras por Mes</h3>
+                            <div class="filter-options">
+                                <select id="report-period">
+                                    <option value="3">Últimos 3 meses</option>
+                                    <option value="6">Últimos 6 meses</option>
+                                    <option value="12">Último año</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="monthlyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Top 5 Empleados con Más Horas</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="topEmployeesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3>Exportar Reportes</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="export-options">
+                            <button class="btn btn-secondary" id="export-pdf-btn">
+                                <i class="fas fa-file-pdf"></i> Exportar a PDF
+                            </button>
+                            <button class="btn btn-secondary" id="export-excel-btn">
+                                <i class="fas fa-file-excel"></i> Exportar a Excel
+                            </button>
+                            <button class="btn btn-secondary" id="generate-chart-btn">
+                                <i class="fas fa-chart-pie"></i> Generar Gráfico
+                            </button>
+                        </div>
+                        <div class="export-info">
+                            <p><i class="fas fa-info-circle"></i> Los reportes incluyen todos los registros de horas extras con información de empleado, departamento, fecha, horas, motivo y estado.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Modal para agregar horas extras -->
+        <div id="overtime-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-clock"></i> Registrar Horas Extras</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="overtime-form">
+                        <div class="form-group">
+                            <label for="employee-select">Empleado</label>
+                            <select id="employee-select" required>
+                                <option value="">Seleccionar empleado...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="overtime-date">Fecha</label>
+                                <input type="date" id="overtime-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="overtime-hours">Horas</label>
+                                <input type="number" id="overtime-hours" min="0.5" max="12" step="0.5" placeholder="2.5" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="overtime-reason">Motivo</label>
+                            <textarea id="overtime-reason" rows="3" placeholder="Describa el motivo de las horas extras..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="overtime-status">Estado</label>
+                            <select id="overtime-status">
+                                <option value="pendiente">Pendiente</option>
+                                <option value="aprobada">Aprobada</option>
+                                <option value="rechazada">Rechazada</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Registro</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal para agregar empleado -->
+        <div id="employee-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user-plus"></i> Agregar Empleado</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="employee-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="employee-name">Nombre</label>
+                                <input type="text" id="employee-name" placeholder="Nombre completo" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-department">Departamento</label>
+                                <select id="employee-department" required>
+                                    <option value="">Seleccionar departamento...</option>
+                                    <option value="Ventas">Ventas</option>
+                                    <option value="Marketing">Marketing</option>
+                                    <option value="TI">TI</option>
+                                    <option value="RRHH">RRHH</option>
+                                    <option value="Finanzas">Finanzas</option>
+                                    <option value="Operaciones">Operaciones</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="employee-email">Correo Electrónico</label>
+                                <input type="email" id="employee-email" placeholder="correo@empresa.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-phone">Teléfono</label>
+                                <input type="tel" id="employee-phone" placeholder="(123) 456-7890">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="employee-position">Cargo</label>
+                            <input type="text" id="employee-position" placeholder="Ej: Desarrollador Senior" required>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Agregar Empleado</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal para detalles de tarjeta Kanban -->
+        <div id="kanban-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="kanban-modal-title"><i class="fas fa-tasks"></i> Detalles de la Tarea</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="kanban-form">
+                        <div class="form-group">
+                            <label for="kanban-title">Título</label>
+                            <input type="text" id="kanban-title" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="kanban-description">Descripción</label>
+                            <textarea id="kanban-description" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="kanban-assignee">Asignado a</label>
+                                <select id="kanban-assignee">
+                                    <option value="">Sin asignar</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="kanban-priority">Prioridad</label>
+                                <select id="kanban-priority">
+                                    <option value="baja">Baja</option>
+                                    <option value="media">Media</option>
+                                    <option value="alta">Alta</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="kanban-status">Estado</label>
+                            <select id="kanban-status">
+                                <option value="pendiente">Pendiente</option>
+                                <option value="en-proceso">En Proceso</option>
+                                <option value="aprobada">Aprobada</option>
+                                <option value="rechazada">Rechazada</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-danger" id="delete-kanban-btn">Eliminar</button>
+                            <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="main-footer">
+            <p>© 2023 Gestor de Horas Extras - Todos los derechos reservados</p>
+            <p class="footer-links">
+                <a href="#"><i class="fas fa-question-circle"></i> Ayuda</a>
+                <a href="#"><i class="fas fa-envelope"></i> Contacto</a>
+                <a href="#"><i class="fas fa-shield-alt"></i> Privacidad</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
