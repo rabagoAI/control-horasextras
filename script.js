@@ -1,183 +1,12 @@
-// Datos iniciales de la aplicación
-let employees = [
-    { 
-        id: 1, 
-        name: "Carlos Rodríguez", 
-        department: "Ventas", 
-        email: "carlos@empresa.com", 
-        phone: "(555) 123-4567", 
-        position: "Ejecutivo de Ventas", 
-        hourlyRate: 50.00,
-        overtime: 12.5, 
-        overtimeAmount: 625.00,
-        lastOvertime: "2023-10-15" 
-    },
-    { 
-        id: 2, 
-        name: "Ana García", 
-        department: "Marketing", 
-        email: "ana@empresa.com", 
-        phone: "(555) 234-5678", 
-        position: "Especialista en Marketing", 
-        hourlyRate: 45.00,
-        overtime: 8.0, 
-        overtimeAmount: 360.00,
-        lastOvertime: "2023-10-18" 
-    },
-    { 
-        id: 3, 
-        name: "Luis Martínez", 
-        department: "TI", 
-        email: "luis@empresa.com", 
-        phone: "(555) 345-6789", 
-        position: "Desarrollador Senior", 
-        hourlyRate: 60.00,
-        overtime: 20.5, 
-        overtimeAmount: 1230.00,
-        lastOvertime: "2023-10-20" 
-    },
-    { 
-        id: 4, 
-        name: "María López", 
-        department: "RRHH", 
-        email: "maria@empresa.com", 
-        phone: "(555) 456-7890", 
-        position: "Gerente de RRHH", 
-        hourlyRate: 55.00,
-        overtime: 5.0, 
-        overtimeAmount: 275.00,
-        lastOvertime: "2023-10-12" 
-    },
-    { 
-        id: 5, 
-        name: "Jorge Pérez", 
-        department: "Finanzas", 
-        email: "jorge@empresa.com", 
-        phone: "(555) 567-8901", 
-        position: "Contador", 
-        hourlyRate: 52.50,
-        overtime: 15.0, 
-        overtimeAmount: 787.50,
-        lastOvertime: "2023-10-19" 
-    },
-    { 
-        id: 6, 
-        name: "Sofía Ramírez", 
-        department: "Operaciones", 
-        email: "sofia@empresa.com", 
-        phone: "(555) 678-9012", 
-        position: "Coordinadora de Operaciones", 
-        hourlyRate: 48.00,
-        overtime: 10.5, 
-        overtimeAmount: 504.00,
-        lastOvertime: "2023-10-16" 
-    }
-];
-
-let overtimeRecords = [
-    { 
-        id: 1, 
-        employeeId: 1, 
-        employeeName: "Carlos Rodríguez", 
-        date: "2023-10-15", 
-        hours: 3.5, 
-        rate: 50.00,
-        amount: 175.00,
-        reason: "Cierre de trimestre", 
-        status: "aprobada" 
-    },
-    { 
-        id: 2, 
-        employeeId: 3, 
-        employeeName: "Luis Martínez", 
-        date: "2023-10-20", 
-        hours: 5.0, 
-        rate: 60.00,
-        amount: 300.00,
-        reason: "Mantenimiento de servidores", 
-        status: "pendiente" 
-    },
-    { 
-        id: 3, 
-        employeeId: 5, 
-        employeeName: "Jorge Pérez", 
-        date: "2023-10-19", 
-        hours: 4.0, 
-        rate: 52.50,
-        amount: 210.00,
-        reason: "Auditoría externa", 
-        status: "aprobada" 
-    },
-    { 
-        id: 4, 
-        employeeId: 2, 
-        employeeName: "Ana García", 
-        date: "2023-10-18", 
-        hours: 2.5, 
-        rate: 45.00,
-        amount: 112.50,
-        reason: "Lanzamiento de campaña", 
-        status: "pendiente" 
-    },
-    { 
-        id: 5, 
-        employeeId: 6, 
-        employeeName: "Sofía Ramírez", 
-        date: "2023-10-16", 
-        hours: 3.0, 
-        rate: 48.00,
-        amount: 144.00,
-        reason: "Optimización de procesos", 
-        status: "rechazada" 
-    },
-    { 
-        id: 6, 
-        employeeId: 4, 
-        employeeName: "María López", 
-        date: "2023-10-12", 
-        hours: 2.0, 
-        rate: 55.00,
-        amount: 110.00,
-        reason: "Entrevistas de selección", 
-        status: "aprobada" 
-    },
-    { 
-        id: 7, 
-        employeeId: 3, 
-        employeeName: "Luis Martínez", 
-        date: "2023-10-10", 
-        hours: 6.0, 
-        rate: 60.00,
-        amount: 360.00,
-        reason: "Migración de base de datos", 
-        status: "aprobada" 
-    },
-    { 
-        id: 8, 
-        employeeId: 1, 
-        employeeName: "Carlos Rodríguez", 
-        date: "2023-10-05", 
-        hours: 4.0, 
-        rate: 50.00,
-        amount: 200.00,
-        reason: "Preparación de presentación", 
-        status: "aprobada" 
-    }
-];
-
-let kanbanTasks = [
-    { id: 1, title: "Revisar horas extras de octubre", description: "Verificar y aprobar las horas extras registradas en octubre", assignee: "Carlos Rodríguez", priority: "alta", status: "pendiente" },
-    { id: 2, title: "Actualizar política de horas extras", description: "Revisar y actualizar la política de compensación por horas extras", assignee: "María López", priority: "media", status: "en-proceso" },
-    { id: 3, title: "Preparar informe mensual", description: "Generar informe de horas extras para el departamento de finanzas", assignee: "Jorge Pérez", priority: "alta", status: "aprobada" },
-    { id: 4, title: "Capacitación nuevo software", description: "Capacitar al equipo en el nuevo sistema de registro de horas", assignee: "Luis Martínez", priority: "baja", status: "pendiente" },
-    { id: 5, title: "Auditar registros Q3", description: "Realizar auditoría de los registros de horas extras del tercer trimestre", assignee: "Sofía Ramírez", priority: "media", status: "en-proceso" },
-    { id: 6, title: "Solicitud de compensación", description: "Procesar solicitud de compensación por horas extras acumuladas", assignee: "Ana García", priority: "alta", status: "rechazada" }
-];
+// Datos iniciales de la aplicación - VACÍOS
+let employees = [];
+let overtimeRecords = [];
+let kanbanTasks = [];
 
 // Variables globales
-let currentOvertimeId = overtimeRecords.length + 1;
-let currentEmployeeId = employees.length + 1;
-let currentKanbanId = kanbanTasks.length + 1;
+let currentOvertimeId = 1;
+let currentEmployeeId = 1;
+let currentKanbanId = 1;
 let draggedTask = null;
 
 // Inicialización cuando el DOM está listo
@@ -189,6 +18,9 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     // Inicializar modo oscuro/claro
     initTheme();
+    
+    // Cargar datos guardados del localStorage
+    loadSavedData();
     
     // Cargar datos iniciales
     loadDashboardData();
@@ -214,6 +46,61 @@ function initializeApp() {
     
     // Configurar botones de exportación
     setupExportButtons();
+}
+
+// Cargar datos guardados del localStorage
+function loadSavedData() {
+    // Intentar cargar empleados
+    const savedEmployees = localStorage.getItem('overtimeEmployees');
+    if (savedEmployees) {
+        try {
+            employees = JSON.parse(savedEmployees);
+            // Actualizar el ID actual basado en el último empleado
+            if (employees.length > 0) {
+                currentEmployeeId = Math.max(...employees.map(e => e.id)) + 1;
+            }
+        } catch (e) {
+            console.error('Error al cargar empleados:', e);
+            employees = [];
+        }
+    }
+    
+    // Intentar cargar registros de horas extras
+    const savedOvertime = localStorage.getItem('overtimeRecords');
+    if (savedOvertime) {
+        try {
+            overtimeRecords = JSON.parse(savedOvertime);
+            // Actualizar el ID actual basado en el último registro
+            if (overtimeRecords.length > 0) {
+                currentOvertimeId = Math.max(...overtimeRecords.map(r => r.id)) + 1;
+            }
+        } catch (e) {
+            console.error('Error al cargar registros de horas extras:', e);
+            overtimeRecords = [];
+        }
+    }
+    
+    // Intentar cargar tareas Kanban
+    const savedKanban = localStorage.getItem('kanbanTasks');
+    if (savedKanban) {
+        try {
+            kanbanTasks = JSON.parse(savedKanban);
+            // Actualizar el ID actual basado en la última tarea
+            if (kanbanTasks.length > 0) {
+                currentKanbanId = Math.max(...kanbanTasks.map(t => t.id)) + 1;
+            }
+        } catch (e) {
+            console.error('Error al cargar tareas Kanban:', e);
+            kanbanTasks = [];
+        }
+    }
+}
+
+// Guardar datos en localStorage
+function saveData() {
+    localStorage.setItem('overtimeEmployees', JSON.stringify(employees));
+    localStorage.setItem('overtimeRecords', JSON.stringify(overtimeRecords));
+    localStorage.setItem('kanbanTasks', JSON.stringify(kanbanTasks));
 }
 
 // Inicializar tema (claro/oscuro)
@@ -248,6 +135,9 @@ function initTheme() {
             themeIcon.classList.add('fa-moon');
             themeText.textContent = 'Modo Oscuro';
         }
+        
+        // Recargar gráficos con nuevos colores
+        loadCharts();
     });
 }
 
@@ -286,7 +176,7 @@ function setupNavigation() {
 
 // Cargar datos del dashboard
 function loadDashboardData() {
-    // Calcular estadísticas
+    // Calcular estadísticas (manejar arrays vacíos)
     const totalEmployees = employees.length;
     const totalOvertime = overtimeRecords
         .filter(record => record.status === 'aprobada')
@@ -313,6 +203,21 @@ function loadDashboardData() {
 function loadOvertimeTable() {
     const tableBody = document.getElementById('overtime-table');
     tableBody.innerHTML = '';
+    
+    if (overtimeRecords.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
+                <i class="fas fa-clock" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                No hay registros de horas extras. <br>
+                <button class="btn btn-primary" onclick="document.getElementById('add-overtime-btn').click()" style="margin-top: 10px;">
+                    <i class="fas fa-plus"></i> Registrar primeras horas extras
+                </button>
+            </td>
+        `;
+        tableBody.appendChild(row);
+        return;
+    }
     
     // Ordenar por fecha (más reciente primero)
     const sortedRecords = [...overtimeRecords].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -376,6 +281,21 @@ function loadOvertimeTable() {
 function loadEmployeesTable() {
     const tableBody = document.getElementById('employees-table');
     tableBody.innerHTML = '';
+    
+    if (employees.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
+                <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                No hay empleados registrados. <br>
+                <button class="btn btn-primary" onclick="document.getElementById('add-employee-btn').click()" style="margin-top: 10px;">
+                    <i class="fas fa-user-plus"></i> Agregar primer empleado
+                </button>
+            </td>
+        `;
+        tableBody.appendChild(row);
+        return;
+    }
     
     employees.forEach(employee => {
         const row = document.createElement('tr');
@@ -545,6 +465,9 @@ function setupKanban() {
                 const taskIndex = kanbanTasks.findIndex(t => t.id === draggedTask.id);
                 if (taskIndex !== -1) {
                     kanbanTasks[taskIndex].status = newStatus;
+                    
+                    // Guardar cambios
+                    saveData();
                     
                     // Recargar panel Kanban
                     loadKanbanBoard();
@@ -800,6 +723,9 @@ function saveOvertime() {
         showNotification('Horas extras registradas correctamente', 'success');
     }
     
+    // Guardar datos
+    saveData();
+    
     // Cerrar modal y actualizar datos
     document.getElementById('overtime-modal').classList.remove('active');
     loadDashboardData();
@@ -831,6 +757,9 @@ function deleteOvertime(id) {
                 employees[employeeIndex].overtime -= record.hours;
                 employees[employeeIndex].overtimeAmount -= record.amount;
             }
+            
+            // Guardar datos
+            saveData();
             
             showNotification('Registro eliminado correctamente', 'success');
             loadDashboardData();
@@ -901,6 +830,9 @@ function saveEmployee() {
         showNotification('Empleado agregado correctamente', 'success');
     }
     
+    // Guardar datos
+    saveData();
+    
     // Cerrar modal y actualizar datos
     document.getElementById('employee-modal').classList.remove('active');
     loadDashboardData();
@@ -938,6 +870,9 @@ function deleteEmployee(id) {
             
             // Eliminar registros de horas extras del empleado
             overtimeRecords = overtimeRecords.filter(record => record.employeeId !== id);
+            
+            // Guardar datos
+            saveData();
             
             // Mostrar notificación
             showNotification(`Empleado "${employeeName}" eliminado correctamente`, 'success');
@@ -1019,6 +954,9 @@ function saveKanbanTask() {
         showNotification('Tarea creada correctamente', 'success');
     }
     
+    // Guardar datos
+    saveData();
+    
     // Cerrar modal y actualizar panel Kanban
     document.getElementById('kanban-modal').classList.remove('active');
     loadKanbanBoard();
@@ -1030,6 +968,10 @@ function deleteKanbanTask(id) {
         const index = kanbanTasks.findIndex(task => task.id === id);
         if (index !== -1) {
             kanbanTasks.splice(index, 1);
+            
+            // Guardar datos
+            saveData();
+            
             showNotification('Tarea eliminada correctamente', 'success');
             
             // Cerrar modal y actualizar panel Kanban
@@ -1075,70 +1017,40 @@ function exportToPDF() {
     // Preparar datos para la tabla
     const tableData = prepareOvertimeDataForPDF();
     
-    // Configurar la tabla
-    doc.autoTable({
-        head: [['Empleado', 'Departamento', 'Fecha', 'Horas', 'Importe/H', 'Total', 'Motivo', 'Estado']],
-        body: tableData,
-        startY: 80,
-        theme: 'grid',
-        headStyles: {
-            fillColor: [74, 111, 165],
-            textColor: 255,
-            fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-            fillColor: [245, 245, 245]
-        },
-        styles: {
-            fontSize: 8,
-            cellPadding: 2,
-            overflow: 'linebreak'
-        },
-        columnStyles: {
-            0: { cellWidth: 30 },
-            1: { cellWidth: 25 },
-            2: { cellWidth: 20 },
-            3: { cellWidth: 12 },
-            4: { cellWidth: 15 },
-            5: { cellWidth: 15 },
-            6: { cellWidth: 40 },
-            7: { cellWidth: 20 }
-        },
-        margin: { top: 80 }
-    });
-    
-    // Agregar página de resumen si hay muchas filas
-    const finalY = doc.lastAutoTable.finalY || 80;
-    
-    if (finalY > 250) {
-        doc.addPage();
-        addSummaryPage(doc, finalY);
+    if (tableData.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.text("No hay registros de horas extras para mostrar", 105, 90, { align: "center" });
     } else {
-        // Agregar resumen al final de la página actual
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.text("Resumen por Departamento", 14, finalY + 20);
-        
-        // Calcular importe por departamento
-        const departmentSummary = {};
-        overtimeRecords.forEach(record => {
-            const employee = employees.find(emp => emp.id === record.employeeId);
-            if (employee && record.status === 'aprobada') {
-                if (!departmentSummary[employee.department]) {
-                    departmentSummary[employee.department] = { hours: 0, amount: 0 };
-                }
-                departmentSummary[employee.department].hours += record.hours;
-                departmentSummary[employee.department].amount += record.amount;
-            }
-        });
-        
-        let yPos = finalY + 28;
-        Object.entries(departmentSummary).forEach(([dept, data], index) => {
-            if (yPos < 280) {
-                doc.setFont("helvetica", "normal");
-                doc.text(`${dept}: ${data.hours.toFixed(2)}h - €${data.amount.toFixed(2)}`, 20, yPos);
-                yPos += 7;
-            }
+        // Configurar la tabla
+        doc.autoTable({
+            head: [['Empleado', 'Departamento', 'Fecha', 'Horas', 'Importe/H', 'Total', 'Motivo', 'Estado']],
+            body: tableData,
+            startY: 80,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [74, 111, 165],
+                textColor: 255,
+                fontStyle: 'bold'
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                overflow: 'linebreak'
+            },
+            columnStyles: {
+                0: { cellWidth: 30 },
+                1: { cellWidth: 25 },
+                2: { cellWidth: 20 },
+                3: { cellWidth: 12 },
+                4: { cellWidth: 15 },
+                5: { cellWidth: 15 },
+                6: { cellWidth: 40 },
+                7: { cellWidth: 20 }
+            },
+            margin: { top: 80 }
         });
     }
     
@@ -1197,88 +1109,6 @@ function prepareOvertimeDataForPDF() {
     });
 }
 
-// Agregar página de resumen
-function addSummaryPage(doc, yPos) {
-    // Resumen por departamento
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("Resumen por Departamento", 105, 20, { align: "center" });
-    
-    // Calcular importe por departamento
-    const departmentSummary = {};
-    overtimeRecords.forEach(record => {
-        const employee = employees.find(emp => emp.id === record.employeeId);
-        if (employee && record.status === 'aprobada') {
-            if (!departmentSummary[employee.department]) {
-                departmentSummary[employee.department] = { hours: 0, amount: 0 };
-            }
-            departmentSummary[employee.department].hours += record.hours;
-            departmentSummary[employee.department].amount += record.amount;
-        }
-    });
-    
-    // Crear tabla de resumen
-    const summaryData = Object.entries(departmentSummary).map(([dept, data]) => [
-        dept,
-        data.hours.toFixed(2),
-        '€' + data.amount.toFixed(2)
-    ]);
-    
-    doc.autoTable({
-        head: [['Departamento', 'Horas Aprobadas', 'Importe Total']],
-        body: summaryData,
-        startY: 30,
-        theme: 'grid',
-        headStyles: {
-            fillColor: [107, 142, 35],
-            textColor: 255,
-            fontStyle: 'bold'
-        },
-        styles: {
-            fontSize: 10
-        }
-    });
-    
-    // Resumen por empleado
-    const summaryY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Top 5 Empleados por Importe", 105, summaryY, { align: "center" });
-    
-    // Calcular top 5 empleados por importe
-    const employeeSummary = {};
-    overtimeRecords.forEach(record => {
-        if (record.status === 'aprobada') {
-            if (!employeeSummary[record.employeeName]) {
-                employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
-            }
-            employeeSummary[record.employeeName].hours += record.hours;
-            employeeSummary[record.employeeName].amount += record.amount;
-        }
-    });
-    
-    const topEmployees = Object.entries(employeeSummary)
-        .map(([name, data]) => ({ name, ...data }))
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 5)
-        .map(emp => [emp.name, emp.hours.toFixed(2), '€' + emp.amount.toFixed(2)]);
-    
-    doc.autoTable({
-        head: [['Empleado', 'Horas', 'Importe Total']],
-        body: topEmployees,
-        startY: summaryY + 10,
-        theme: 'grid',
-        headStyles: {
-            fillColor: [139, 69, 19],
-            textColor: 255,
-            fontStyle: 'bold'
-        },
-        styles: {
-            fontSize: 10
-        }
-    });
-}
-
 // Exportar a Excel (.xlsx) usando SheetJS
 function exportToExcelXLSX() {
     showNotification('Generando archivo Excel (.xlsx)...', 'info');
@@ -1289,18 +1119,24 @@ function exportToExcelXLSX() {
         
         // Hoja 1: Horas Extras
         const overtimeData = prepareOvertimeDataForExcel();
-        const ws1 = XLSX.utils.json_to_sheet(overtimeData);
-        XLSX.utils.book_append_sheet(wb, ws1, "Horas Extras");
+        if (overtimeData.length > 0) {
+            const ws1 = XLSX.utils.json_to_sheet(overtimeData);
+            XLSX.utils.book_append_sheet(wb, ws1, "Horas Extras");
+        }
         
         // Hoja 2: Resumen por Departamento
         const departmentData = prepareDepartmentDataForExcel();
-        const ws2 = XLSX.utils.json_to_sheet(departmentData);
-        XLSX.utils.book_append_sheet(wb, ws2, "Resumen por Depto");
+        if (departmentData.length > 0) {
+            const ws2 = XLSX.utils.json_to_sheet(departmentData);
+            XLSX.utils.book_append_sheet(wb, ws2, "Resumen por Depto");
+        }
         
         // Hoja 3: Resumen por Empleado
         const employeeData = prepareEmployeeDataForExcel();
-        const ws3 = XLSX.utils.json_to_sheet(employeeData);
-        XLSX.utils.book_append_sheet(wb, ws3, "Resumen por Empleado");
+        if (employeeData.length > 0) {
+            const ws3 = XLSX.utils.json_to_sheet(employeeData);
+            XLSX.utils.book_append_sheet(wb, ws3, "Resumen por Empleado");
+        }
         
         // Hoja 4: Metadatos
         const totalApprovedAmount = overtimeRecords
@@ -1387,7 +1223,8 @@ function prepareDepartmentDataForExcel() {
         "Departamento": department,
         "Horas Extras Aprobadas": data.hours,
         "Importe Total": data.amount,
-        "Porcentaje": ((data.amount / Object.values(departmentSummary).reduce((sum, d) => sum + d.amount, 0)) * 100).toFixed(2) + "%"
+        "Porcentaje": Object.values(departmentSummary).reduce((sum, d) => sum + d.amount, 0) > 0 ? 
+            ((data.amount / Object.values(departmentSummary).reduce((sum, d) => sum + d.amount, 0)) * 100).toFixed(2) + "%" : "0%"
     }));
 }
 
@@ -1462,6 +1299,19 @@ function createDepartmentChart() {
     const departments = Object.keys(departmentHours);
     const hours = Object.values(departmentHours);
     
+    if (departments.length === 0) {
+        // Mostrar gráfico vacío con mensaje
+        const container = document.getElementById('departmentChart').parentElement;
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
+                <i class="fas fa-chart-pie" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                No hay datos suficientes para mostrar el gráfico de departamentos.
+                <br>Registre horas extras aprobadas para ver la distribución.
+            </div>
+        `;
+        return;
+    }
+    
     // Colores para los departamentos
     const colors = [
         'rgba(74, 111, 165, 0.7)',
@@ -1495,7 +1345,8 @@ function createDepartmentChart() {
                         color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
                         padding: 20,
                         font: {
-                            size: 12
+                            size: 12,
+                            weight: 'bold'
                         }
                     }
                 },
@@ -1504,7 +1355,8 @@ function createDepartmentChart() {
                     text: 'Horas Extras por Departamento',
                     color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
                     font: {
-                        size: 16
+                        size: 16,
+                        weight: 'bold'
                     }
                 }
             }
@@ -1581,7 +1433,7 @@ function createAmountChart() {
     
     // Datos de ejemplo para los últimos 6 meses
     const months = ['May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct'];
-    const amounts = [2250, 3100, 3900, 4750, 5500, 7375]; // Asumiendo €50/h de promedio
+    const amounts = [2250, 3100, 3900, 4750, 5500, 7375];
     
     new Chart(ctx, {
         type: 'bar',
@@ -1653,6 +1505,19 @@ function createTopEmployeesChart() {
             employeeSummary[record.employeeName].amount += record.amount;
         }
     });
+    
+    if (Object.keys(employeeSummary).length === 0) {
+        // Mostrar gráfico vacío con mensaje
+        const container = document.getElementById('topEmployeesChart').parentElement;
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
+                <i class="fas fa-chart-bar" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                No hay datos suficientes para mostrar el ranking de empleados.
+                <br>Registre horas extras aprobadas para ver el top 5.
+            </div>
+        `;
+        return;
+    }
     
     // Convertir a array y ordenar por importe
     const employeeArray = Object.entries(employeeSummary)
