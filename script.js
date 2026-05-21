@@ -8,6 +8,103 @@ let currentOvertimeId = 1;
 let currentEmployeeId = 1;
 let currentKanbanId = 1;
 let draggedTask = null;
+let overtimeFilterEmployeeId = '';
+let overtimeFilterStatus = '';
+let overtimeFilterDateFrom = '';
+let overtimeFilterDateTo = '';
+let employeeSearchTerm = '';
+
+const PAGE_SIZE = 10;
+let overtimeCurrentPage = 1;
+let employeesCurrentPage = 1;
+
+// ── Modal de confirmación ────────────────────────────────────────────────────
+function showConfirmModal({ title = '¿Estás seguro?', message = '', warning = '', confirmText = 'Eliminar', danger = true, onConfirm, onCancel = null }) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+
+    const warningEl = document.getElementById('confirm-warning');
+    warningEl.textContent = warning;
+    warningEl.style.display = warning ? 'block' : 'none';
+
+    const okBtn = document.getElementById('confirm-ok-btn');
+    okBtn.textContent = confirmText;
+    okBtn.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+
+    const wrapper = document.getElementById('confirm-icon-wrapper');
+    const icon = document.getElementById('confirm-icon');
+    if (danger) {
+        wrapper.className = 'confirm-icon-wrapper';
+        icon.className = 'fas fa-trash-alt';
+    } else {
+        wrapper.className = 'confirm-icon-wrapper confirm-warning-icon';
+        icon.className = 'fas fa-exclamation-triangle';
+    }
+
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.add('active');
+
+    const cleanup = () => {
+        okBtn.removeEventListener('click', handleOk);
+        cancelBtn.removeEventListener('click', handleCancel);
+        modal.removeEventListener('click', handleBackdrop);
+    };
+
+    const handleOk = () => { modal.classList.remove('active'); cleanup(); onConfirm(); };
+    const handleCancel = () => { modal.classList.remove('active'); cleanup(); if (onCancel) onCancel(); };
+    const handleBackdrop = (e) => { if (e.target === modal) handleCancel(); };
+
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
+    okBtn.addEventListener('click', handleOk);
+    cancelBtn.addEventListener('click', handleCancel);
+    modal.addEventListener('click', handleBackdrop);
+}
+
+// ── Paginación ───────────────────────────────────────────────────────────────
+function renderPagination(containerId, currentPage, totalPages, totalItems, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (totalPages <= 1) {
+        container.innerHTML = totalItems > 0
+            ? `<span class="pagination-info">${totalItems} registro${totalItems !== 1 ? 's' : ''}</span>`
+            : '';
+        return;
+    }
+
+    const from = (currentPage - 1) * PAGE_SIZE + 1;
+    const to = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+    container.innerHTML = `
+        <span class="pagination-info">${from}–${to} de ${totalItems} registros</span>
+        <div class="pagination-pages">
+            <button class="pagination-btn" id="${containerId}-prev" ${currentPage === 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i> Anterior
+            </button>
+            <button class="pagination-btn active">${currentPage} / ${totalPages}</button>
+            <button class="pagination-btn" id="${containerId}-next" ${currentPage === totalPages ? 'disabled' : ''}>
+                Siguiente <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    `;
+
+    container.querySelector(`#${containerId}-prev`)?.addEventListener('click', () => onPageChange(currentPage - 1));
+    container.querySelector(`#${containerId}-next`)?.addEventListener('click', () => onPageChange(currentPage + 1));
+}
+
+// ── Estado vacío ─────────────────────────────────────────────────────────────
+function emptyStateHtml(icon, title, desc, btnText = '', btnAction = '') {
+    const btn = btnText
+        ? `<button class="btn btn-primary" onclick="${btnAction}"><i class="fas fa-plus"></i> ${btnText}</button>`
+        : '';
+    return `
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-${icon}"></i></div>
+            <p class="empty-state-title">${title}</p>
+            <p class="empty-state-desc">${desc}</p>
+            ${btn}
+        </div>`;
+}
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
@@ -43,7 +140,10 @@ function initializeApp() {
     
     // Configurar eventos de búsqueda
     setupSearch();
-    
+
+    // Configurar filtros y selección múltiple de horas extras
+    setupOvertimeFilters();
+
     // Configurar botones de exportación
     setupExportButtons();
 }
@@ -179,7 +279,7 @@ function loadDashboardData() {
     // Calcular estadísticas (manejar arrays vacíos)
     const totalEmployees = employees.length;
     const totalOvertime = overtimeRecords
-        .filter(record => record.status === 'aprobada')
+        .filter(record => record.status === 'aprobada' || record.status === 'pagada')
         .reduce((sum, record) => sum + record.hours, 0);
     const pendingApprovals = overtimeRecords.filter(record => record.status === 'pendiente').length;
     const totalPay = overtimeRecords
@@ -203,59 +303,64 @@ function loadDashboardData() {
 function loadOvertimeTable() {
     const tableBody = document.getElementById('overtime-table');
     tableBody.innerHTML = '';
-    
-    if (overtimeRecords.length === 0) {
+
+    // Aplicar filtros
+    let filteredRecords = [...overtimeRecords];
+    if (overtimeFilterEmployeeId) {
+        filteredRecords = filteredRecords.filter(r => r.employeeId === parseInt(overtimeFilterEmployeeId));
+    }
+    if (overtimeFilterStatus) {
+        filteredRecords = filteredRecords.filter(r => r.status === overtimeFilterStatus);
+    }
+    if (overtimeFilterDateFrom) {
+        filteredRecords = filteredRecords.filter(r => r.date >= overtimeFilterDateFrom);
+    }
+    if (overtimeFilterDateTo) {
+        filteredRecords = filteredRecords.filter(r => r.date <= overtimeFilterDateTo);
+    }
+
+    if (filteredRecords.length === 0) {
         const row = document.createElement('tr');
-        row.innerHTML = `
-            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
-                <i class="fas fa-clock" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
-                No hay registros de horas extras. <br>
-                <button class="btn btn-primary" onclick="document.getElementById('add-overtime-btn').click()" style="margin-top: 10px;">
-                    <i class="fas fa-plus"></i> Registrar primeras horas extras
-                </button>
-            </td>
-        `;
+        if (overtimeRecords.length === 0) {
+            row.innerHTML = `<td colspan="9">${emptyStateHtml('clock', 'Aún no hay horas extras registradas', 'Empieza registrando las primeras horas extras de tu equipo.', 'Registrar horas', "document.getElementById('add-overtime-btn').click()")}</td>`;
+        } else {
+            row.innerHTML = `<td colspan="9">${emptyStateHtml('filter', 'Sin resultados', 'No hay registros que coincidan con los filtros seleccionados.')}</td>`;
+        }
         tableBody.appendChild(row);
+        const selectAll = document.getElementById('select-all-overtime');
+        if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+        updateBulkDeleteToolbar();
+        document.getElementById('overtime-pagination').innerHTML = '';
         return;
     }
-    
+
     // Ordenar por fecha (más reciente primero)
-    const sortedRecords = [...overtimeRecords].sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    // Mostrar solo los últimos 8 registros
-    const recentRecords = sortedRecords.slice(0, 8);
-    
-    recentRecords.forEach(record => {
+    filteredRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Paginación
+    const totalItems = filteredRecords.length;
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    if (overtimeCurrentPage > totalPages) overtimeCurrentPage = totalPages;
+    const pageStart = (overtimeCurrentPage - 1) * PAGE_SIZE;
+    filteredRecords = filteredRecords.slice(pageStart, pageStart + PAGE_SIZE);
+
+    filteredRecords.forEach(record => {
         const row = document.createElement('tr');
-        
-        // Formatear fecha
+
         const dateObj = new Date(record.date);
-        const formattedDate = dateObj.toLocaleDateString('es-ES', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            year: 'numeric' 
-        });
-        
-        // Determinar clase de estado
+        const formattedDate = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
         let statusClass = '';
         let statusText = '';
-        
         switch(record.status) {
-            case 'pendiente':
-                statusClass = 'status-pendiente';
-                statusText = 'Pendiente';
-                break;
-            case 'aprobada':
-                statusClass = 'status-aprobada';
-                statusText = 'Aprobada';
-                break;
-            case 'rechazada':
-                statusClass = 'status-rechazada';
-                statusText = 'Rechazada';
-                break;
+            case 'pendiente': statusClass = 'status-pendiente'; statusText = 'Pendiente'; break;
+            case 'aprobada':  statusClass = 'status-aprobada';  statusText = 'Aprobada';  break;
+            case 'pagada':    statusClass = 'status-pagada';    statusText = 'Pagada';    break;
+            case 'rechazada': statusClass = 'status-rechazada'; statusText = 'Rechazada'; break;
         }
-        
+
         row.innerHTML = `
+            <td><input type="checkbox" class="overtime-checkbox" data-id="${record.id}"></td>
             <td>${record.employeeName}</td>
             <td>${formattedDate}</td>
             <td>${record.hours}</td>
@@ -264,40 +369,197 @@ function loadOvertimeTable() {
             <td>${record.reason}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
-                <button class="btn btn-secondary btn-sm" onclick="editOvertime(${record.id})">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-secondary btn-sm" onclick="deleteOvertime(${record.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <button class="btn btn-secondary btn-sm" onclick="editOvertime(${record.id})"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-secondary btn-sm" onclick="deleteOvertime(${record.id})"><i class="fas fa-trash"></i></button>
             </td>
         `;
-        
+
+        row.querySelector('.overtime-checkbox').addEventListener('change', updateBulkDeleteToolbar);
         tableBody.appendChild(row);
     });
+
+    renderPagination('overtime-pagination', overtimeCurrentPage, totalPages, totalItems, (page) => {
+        overtimeCurrentPage = page;
+        loadOvertimeTable();
+    });
+
+    updateBulkDeleteToolbar();
+}
+
+// Actualizar toolbar de borrado masivo y checkbox "seleccionar todos"
+function updateBulkDeleteToolbar() {
+    const checked = document.querySelectorAll('.overtime-checkbox:checked');
+    const all = document.querySelectorAll('.overtime-checkbox');
+    const bulkActions = document.getElementById('bulk-actions');
+    const selectedCount = document.getElementById('selected-count');
+    const selectAll = document.getElementById('select-all-overtime');
+
+    if (bulkActions) {
+        if (checked.length > 0) {
+            bulkActions.style.display = 'flex';
+            selectedCount.textContent = `${checked.length} seleccionado${checked.length !== 1 ? 's' : ''}`;
+        } else {
+            bulkActions.style.display = 'none';
+        }
+    }
+
+    if (selectAll && all.length > 0) {
+        selectAll.checked = checked.length === all.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
+}
+
+// Poblar el filtro de empleados de la tabla de horas
+function populateOvertimeEmployeeFilter() {
+    const select = document.getElementById('overtime-employee-filter');
+    if (!select) return;
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">Todos los empleados</option>';
+    employees.forEach(emp => {
+        const option = document.createElement('option');
+        option.value = emp.id;
+        option.textContent = `${emp.name} (${emp.department})`;
+        select.appendChild(option);
+    });
+    // Restaurar selección; si el empleado fue borrado, quedará en ""
+    select.value = currentValue;
+    if (select.value !== currentValue) {
+        overtimeFilterEmployeeId = '';
+    }
+}
+
+// Configurar filtros y selección múltiple de la tabla de horas
+function setupOvertimeFilters() {
+    const employeeFilter = document.getElementById('overtime-employee-filter');
+    const statusFilter = document.getElementById('overtime-status-filter');
+    const selectAll = document.getElementById('select-all-overtime');
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+
+    employeeFilter.addEventListener('change', function() {
+        overtimeFilterEmployeeId = this.value;
+        overtimeCurrentPage = 1;
+        loadOvertimeTable();
+    });
+
+    statusFilter.addEventListener('change', function() {
+        overtimeFilterStatus = this.value;
+        overtimeCurrentPage = 1;
+        loadOvertimeTable();
+    });
+
+    selectAll.addEventListener('change', function() {
+        document.querySelectorAll('.overtime-checkbox').forEach(cb => cb.checked = this.checked);
+        updateBulkDeleteToolbar();
+    });
+
+    deleteSelectedBtn.addEventListener('click', deleteSelectedOvertimes);
+
+    document.getElementById('overtime-date-from').addEventListener('change', function() {
+        overtimeFilterDateFrom = this.value;
+        overtimeCurrentPage = 1;
+        loadOvertimeTable();
+    });
+
+    document.getElementById('overtime-date-to').addEventListener('change', function() {
+        overtimeFilterDateTo = this.value;
+        overtimeCurrentPage = 1;
+        loadOvertimeTable();
+    });
+}
+
+// Eliminar múltiples registros seleccionados
+function deleteSelectedOvertimes() {
+    const checked = document.querySelectorAll('.overtime-checkbox:checked');
+    if (checked.length === 0) return;
+
+    const count = checked.length;
+    const ids = new Set(Array.from(checked).map(cb => parseInt(cb.dataset.id)));
+
+    showConfirmModal({
+        title: `Eliminar ${count} registro${count !== 1 ? 's' : ''}`,
+        message: `Se eliminarán ${count} registro${count !== 1 ? 's' : ''} de horas extras de forma permanente.`,
+        warning: 'Las horas aprobadas o pagadas se descontarán de las estadísticas de cada empleado.',
+        confirmText: `Eliminar ${count}`,
+        danger: true,
+        onConfirm: () => {
+            overtimeRecords
+                .filter(r => ids.has(r.id) && (r.status === 'aprobada' || r.status === 'pagada'))
+                .forEach(record => {
+                    const emp = employees.find(e => e.id === record.employeeId);
+                    if (emp) { emp.overtime -= record.hours; emp.overtimeAmount -= record.amount; }
+                });
+            overtimeRecords = overtimeRecords.filter(r => !ids.has(r.id));
+            saveData();
+            showNotification(`${count} registro${count !== 1 ? 's eliminados' : ' eliminado'} correctamente`, 'success');
+            loadDashboardData();
+            loadEmployeesTable();
+        }
+    });
+}
+
+// Mostrar error de validación inline bajo un campo del formulario
+function showFieldError(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+    const formGroup = field.closest('.form-group');
+    if (!formGroup) return;
+    formGroup.classList.add('has-error');
+    let errorSpan = formGroup.querySelector('.field-error');
+    if (!errorSpan) {
+        errorSpan = document.createElement('span');
+        errorSpan.className = 'field-error';
+        field.after(errorSpan);
+    }
+    errorSpan.textContent = message;
+    errorSpan.style.display = 'block';
+    field.focus();
+}
+
+// Limpiar todos los errores de validación de un formulario
+function clearFieldErrors(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    form.querySelectorAll('.field-error').forEach(el => {
+        el.style.display = 'none';
+        el.textContent = '';
+    });
+    form.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
 }
 
 // Cargar tabla de empleados
 function loadEmployeesTable() {
     const tableBody = document.getElementById('employees-table');
     tableBody.innerHTML = '';
-    
-    if (employees.length === 0) {
+
+    // Filtrar por término de búsqueda
+    let filtered = employees;
+    if (employeeSearchTerm) {
+        filtered = employees.filter(emp =>
+            emp.name.toLowerCase().includes(employeeSearchTerm) ||
+            emp.department.toLowerCase().includes(employeeSearchTerm)
+        );
+    }
+
+    if (filtered.length === 0) {
         const row = document.createElement('tr');
-        row.innerHTML = `
-            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
-                <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
-                No hay empleados registrados. <br>
-                <button class="btn btn-primary" onclick="document.getElementById('add-employee-btn').click()" style="margin-top: 10px;">
-                    <i class="fas fa-user-plus"></i> Agregar primer empleado
-                </button>
-            </td>
-        `;
+        if (employees.length === 0) {
+            row.innerHTML = `<td colspan="6">${emptyStateHtml('users', 'Aún no hay empleados', 'Agrega el primer empleado para empezar a registrar horas extras.', 'Agregar empleado', "document.getElementById('add-employee-btn').click()")}</td>`;
+        } else {
+            row.innerHTML = `<td colspan="6">${emptyStateHtml('search', 'Sin resultados', 'No hay empleados que coincidan con la búsqueda.')}</td>`;
+        }
         tableBody.appendChild(row);
+        document.getElementById('employees-pagination').innerHTML = '';
         return;
     }
-    
-    employees.forEach(employee => {
+
+    // Paginación
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    if (employeesCurrentPage > totalPages) employeesCurrentPage = totalPages;
+    const pageStart = (employeesCurrentPage - 1) * PAGE_SIZE;
+    const pageRecords = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
+    pageRecords.forEach(employee => {
         const row = document.createElement('tr');
         
         // Formatear última fecha de horas extras
@@ -332,6 +594,11 @@ function loadEmployeesTable() {
         
         tableBody.appendChild(row);
     });
+
+    renderPagination('employees-pagination', employeesCurrentPage, totalPages, totalItems, (page) => {
+        employeesCurrentPage = page;
+        loadEmployeesTable();
+    });
 }
 
 // Cargar panel Kanban
@@ -357,24 +624,30 @@ function loadKanbanBoard() {
     // Añadir tareas a las columnas correspondientes
     kanbanTasks.forEach(task => {
         const card = createKanbanCard(task);
-        
+
         let columnId;
         switch(task.status) {
-            case 'pendiente':
-                columnId = 'pending-column';
-                break;
-            case 'en-proceso':
-                columnId = 'inprogress-column';
-                break;
-            case 'aprobada':
-                columnId = 'approved-column';
-                break;
-            case 'rechazada':
-                columnId = 'rejected-column';
-                break;
+            case 'pendiente':    columnId = 'pending-column';    break;
+            case 'en-proceso':  columnId = 'inprogress-column'; break;
+            case 'aprobada':    columnId = 'approved-column';   break;
+            case 'rechazada':   columnId = 'rejected-column';   break;
         }
-        
+
         document.getElementById(columnId).appendChild(card);
+    });
+
+    // Empty states por columna
+    const emptyDefs = [
+        { col: 'pending-column',    count: pendingCount,    icon: 'fa-inbox',        title: 'Sin tareas pendientes',  desc: 'Añade una nueva tarea con el botón +' },
+        { col: 'inprogress-column', count: inProgressCount, icon: 'fa-spinner',      title: 'Nada en proceso',        desc: 'Arrastra una tarea aquí para iniciarla' },
+        { col: 'approved-column',   count: approvedCount,   icon: 'fa-check-circle', title: 'Sin aprobadas',          desc: 'Las tareas completadas aparecerán aquí' },
+        { col: 'rejected-column',   count: rejectedCount,   icon: 'fa-times-circle', title: 'Sin rechazadas',         desc: 'Las tareas descartadas aparecerán aquí' },
+    ];
+    emptyDefs.forEach(({ col, count, icon, title, desc }) => {
+        if (count === 0) {
+            const el = document.getElementById(col);
+            el.innerHTML = `<div class="empty-state" style="padding:24px 12px"><i class="fas ${icon} empty-state-icon" style="font-size:1.6rem"></i><p class="empty-state-title" style="font-size:.9rem;margin:8px 0 4px">${title}</p><p class="empty-state-desc" style="font-size:.78rem">${desc}</p></div>`;
+        }
     });
 }
 
@@ -524,19 +797,29 @@ function setupModals() {
     
     // Cargar lista de empleados en el select de horas extras
     loadEmployeeSelect();
+
+    // Autorellenar tarifa al elegir empleado en el formulario de horas
+    document.getElementById('employee-select').addEventListener('change', function() {
+        if (this.value) {
+            const emp = employees.find(e => e.id === parseInt(this.value));
+            if (emp) document.getElementById('overtime-rate').value = emp.hourlyRate;
+        }
+    });
 }
 
 // Cargar select de empleados
 function loadEmployeeSelect() {
     const select = document.getElementById('employee-select');
     select.innerHTML = '<option value="">Seleccionar empleado...</option>';
-    
+
     employees.forEach(employee => {
         const option = document.createElement('option');
         option.value = employee.id;
         option.textContent = `${employee.name} (${employee.department}) - €${employee.hourlyRate}/h`;
         select.appendChild(option);
     });
+
+    populateOvertimeEmployeeFilter();
 }
 
 // Configurar eventos de formularios
@@ -568,47 +851,121 @@ function setupForms() {
 
 // Configurar búsqueda de empleados
 function setupSearch() {
-    const searchInput = document.getElementById('employee-search');
-    
-    searchInput.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const tableBody = document.getElementById('employees-table');
-        const rows = tableBody.querySelectorAll('tr');
-        
-        rows.forEach(row => {
-            const name = row.cells[0].textContent.toLowerCase();
-            const department = row.cells[1].textContent.toLowerCase();
-            
-            if (name.includes(searchTerm) || department.includes(searchTerm)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+    document.getElementById('employee-search').addEventListener('input', function() {
+        employeeSearchTerm = this.value.toLowerCase();
+        employeesCurrentPage = 1;
+        loadEmployeesTable();
     });
 }
 
 // Configurar botones de exportación
 function setupExportButtons() {
-    // Botón PDF
     const pdfBtn = document.getElementById('export-pdf-btn');
-    if (pdfBtn) {
-        pdfBtn.addEventListener('click', exportToPDF);
-    }
-    
-    // Botón Excel
+    if (pdfBtn) pdfBtn.addEventListener('click', exportToPDF);
+
     const excelBtn = document.getElementById('export-excel-btn');
-    if (excelBtn) {
-        excelBtn.addEventListener('click', exportToExcelXLSX);
-    }
-    
-    // Botón Gráfico
+    if (excelBtn) excelBtn.addEventListener('click', exportToExcelXLSX);
+
     const chartBtn = document.getElementById('generate-chart-btn');
     if (chartBtn) {
         chartBtn.addEventListener('click', function() {
             showNotification('Función de generación de gráficos personalizados en desarrollo', 'info');
         });
     }
+
+    const backupBtn = document.getElementById('export-backup-btn');
+    if (backupBtn) backupBtn.addEventListener('click', exportBackup);
+
+    const importInput = document.getElementById('import-backup-input');
+    if (importInput) {
+        importInput.addEventListener('change', function() {
+            if (this.files[0]) {
+                importBackup(this.files[0]);
+                this.value = ''; // permite reimportar el mismo archivo
+            }
+        });
+    }
+}
+
+// Exportar todos los datos como JSON
+function exportBackup() {
+    const backup = {
+        version: 1,
+        exportDate: new Date().toISOString(),
+        employees: employees,
+        overtimeRecords: overtimeRecords,
+        kanbanTasks: kanbanTasks
+    };
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-horas-extras-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification('Backup exportado correctamente', 'success');
+}
+
+function doImportBackup(backup) {
+    employees = backup.employees;
+    overtimeRecords = backup.overtimeRecords;
+    kanbanTasks = backup.kanbanTasks || [];
+
+    currentEmployeeId = employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1;
+    currentOvertimeId = overtimeRecords.length > 0 ? Math.max(...overtimeRecords.map(r => r.id)) + 1 : 1;
+    currentKanbanId = kanbanTasks.length > 0 ? Math.max(...kanbanTasks.map(t => t.id)) + 1 : 1;
+
+    overtimeFilterEmployeeId = '';
+    overtimeFilterStatus = '';
+    overtimeFilterDateFrom = '';
+    overtimeFilterDateTo = '';
+    overtimeCurrentPage = 1;
+    employeesCurrentPage = 1;
+
+    saveData();
+    loadDashboardData();
+    loadEmployeesTable();
+    loadEmployeeSelect();
+    loadOvertimeTable();
+    loadKanbanBoard();
+    loadCharts();
+
+    showNotification(`Backup importado: ${employees.length} empleados, ${overtimeRecords.length} registros`, 'success');
+}
+
+// Importar datos desde un archivo JSON de backup
+function importBackup(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const backup = JSON.parse(e.target.result);
+
+            if (!Array.isArray(backup.employees) || !Array.isArray(backup.overtimeRecords)) {
+                showNotification('El archivo no tiene el formato correcto', 'error');
+                return;
+            }
+
+            const exportDateStr = backup.exportDate
+                ? new Date(backup.exportDate).toLocaleDateString('es-ES')
+                : 'desconocida';
+
+            showConfirmModal({
+                title: 'Importar backup',
+                message: `Se reemplazarán TODOS los datos actuales con los del backup del ${exportDateStr}.`,
+                warning: `Contenido: ${backup.employees.length} empleados · ${backup.overtimeRecords.length} registros de horas · ${(backup.kanbanTasks || []).length} tareas Kanban`,
+                confirmText: 'Importar',
+                danger: false,
+                onConfirm: () => doImportBackup(backup)
+            });
+        } catch (err) {
+            showNotification('Error al leer el archivo de backup', 'error');
+        }
+    };
+    reader.readAsText(file);
 }
 
 // Abrir modal de horas extras
@@ -616,6 +973,7 @@ function openOvertimeModal(overtime = null) {
     const modal = document.getElementById('overtime-modal');
     const form = document.getElementById('overtime-form');
     const modalTitle = modal.querySelector('h3');
+    clearFieldErrors('overtime-form');
     
     if (overtime) {
         // Modo edición
@@ -638,34 +996,63 @@ function openOvertimeModal(overtime = null) {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('overtime-date').value = today;
         
-        // Si hay un empleado seleccionado, usar su tarifa por defecto
-        const employeeSelect = document.getElementById('employee-select');
-        employeeSelect.addEventListener('change', function() {
-            if (this.value) {
-                const employee = employees.find(emp => emp.id === parseInt(this.value));
-                if (employee) {
-                    document.getElementById('overtime-rate').value = employee.hourlyRate;
-                }
-            }
-        });
     }
-    
+
     modal.classList.add('active');
 }
 
 // Guardar horas extras
 function saveOvertime() {
+    clearFieldErrors('overtime-form');
+
     const form = document.getElementById('overtime-form');
     const employeeId = parseInt(document.getElementById('employee-select').value);
     const employee = employees.find(emp => emp.id === employeeId);
-    
+
     if (!employee) {
-        showNotification('Por favor, seleccione un empleado válido', 'error');
+        showFieldError('employee-select', 'Selecciona un empleado válido');
         return;
     }
-    
+
     const hours = parseFloat(document.getElementById('overtime-hours').value);
     const rate = parseFloat(document.getElementById('overtime-rate').value);
+    const date = document.getElementById('overtime-date').value;
+
+    let hasErrors = false;
+
+    if (!hours || hours <= 0) {
+        showFieldError('overtime-hours', 'Las horas deben ser un valor positivo');
+        hasErrors = true;
+    } else if (hours > 24) {
+        showFieldError('overtime-hours', 'No se pueden registrar más de 24 horas en un día');
+        hasErrors = true;
+    }
+
+    if (!rate || rate <= 0) {
+        showFieldError('overtime-rate', 'El importe por hora debe ser mayor que cero');
+        hasErrors = true;
+    }
+
+    if (!date) {
+        showFieldError('overtime-date', 'La fecha es obligatoria');
+        hasErrors = true;
+    }
+
+    if (hasErrors) return;
+
+    // Detectar registro duplicado (mismo empleado y misma fecha)
+    const currentId = form.dataset.id ? parseInt(form.dataset.id) : null;
+    const duplicate = overtimeRecords.find(r => r.employeeId === employeeId && r.date === date && r.id !== currentId);
+    if (duplicate) {
+        const dateFormatted = new Date(date + 'T12:00:00').toLocaleDateString('es-ES');
+        const confirmed = confirm(
+            `Ya existe un registro para ${employee.name} el ${dateFormatted}.\n\n` +
+            `Registro existente: ${duplicate.hours}h — ${duplicate.status}\n\n` +
+            `¿Quieres añadir otro registro para el mismo día?`
+        );
+        if (!confirmed) return;
+    }
+
     const amount = hours * rate;
     
     const overtimeData = {
@@ -690,16 +1077,15 @@ function saveOvertime() {
             // Actualizar estadísticas del empleado
             const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
             if (employeeIndex !== -1) {
-                if (oldRecord.status === 'aprobada' && overtimeData.status === 'aprobada') {
-                    // Si ambos son aprobados, actualizar diferencia
+                const oldCounts = oldRecord.status === 'aprobada' || oldRecord.status === 'pagada';
+                const newCounts = overtimeData.status === 'aprobada' || overtimeData.status === 'pagada';
+                if (oldCounts && newCounts) {
                     employees[employeeIndex].overtime += (overtimeData.hours - oldRecord.hours);
                     employees[employeeIndex].overtimeAmount += (overtimeData.amount - oldRecord.amount);
-                } else if (oldRecord.status === 'aprobada' && overtimeData.status !== 'aprobada') {
-                    // Si antes estaba aprobado y ahora no, restar
+                } else if (oldCounts && !newCounts) {
                     employees[employeeIndex].overtime -= oldRecord.hours;
                     employees[employeeIndex].overtimeAmount -= oldRecord.amount;
-                } else if (oldRecord.status !== 'aprobada' && overtimeData.status === 'aprobada') {
-                    // Si antes no estaba aprobado y ahora sí, sumar
+                } else if (!oldCounts && newCounts) {
                     employees[employeeIndex].overtime += overtimeData.hours;
                     employees[employeeIndex].overtimeAmount += overtimeData.amount;
                 }
@@ -712,9 +1098,9 @@ function saveOvertime() {
         // Agregar nuevo registro
         overtimeRecords.push(overtimeData);
         
-        // Actualizar horas acumuladas del empleado si está aprobado
+        // Actualizar horas acumuladas del empleado si está aprobado o pagado
         const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
-        if (employeeIndex !== -1 && overtimeData.status === 'aprobada') {
+        if (employeeIndex !== -1 && (overtimeData.status === 'aprobada' || overtimeData.status === 'pagada')) {
             employees[employeeIndex].overtime += overtimeData.hours;
             employees[employeeIndex].overtimeAmount += overtimeData.amount;
             employees[employeeIndex].lastOvertime = overtimeData.date;
@@ -742,30 +1128,32 @@ function editOvertime(id) {
 
 // Eliminar horas extras
 function deleteOvertime(id) {
-    if (confirm('¿Está seguro de que desea eliminar este registro de horas extras?')) {
-        const index = overtimeRecords.findIndex(record => record.id === id);
-        if (index !== -1) {
-            // Obtener el registro para actualizar estadísticas del empleado
-            const record = overtimeRecords[index];
-            const employeeIndex = employees.findIndex(emp => emp.id === record.employeeId);
-            
-            // Eliminar el registro
+    const record = overtimeRecords.find(r => r.id === id);
+    if (!record) return;
+    const dateStr = new Date(record.date + 'T12:00:00').toLocaleDateString('es-ES');
+    const counts = record.status === 'aprobada' || record.status === 'pagada';
+
+    showConfirmModal({
+        title: 'Eliminar registro',
+        message: `${record.employeeName} · ${record.hours}h el ${dateStr}`,
+        warning: counts ? 'Se descontarán las horas de las estadísticas del empleado.' : '',
+        confirmText: 'Eliminar',
+        danger: true,
+        onConfirm: () => {
+            const index = overtimeRecords.findIndex(r => r.id === id);
+            if (index === -1) return;
+            const empIdx = employees.findIndex(e => e.id === record.employeeId);
             overtimeRecords.splice(index, 1);
-            
-            // Actualizar estadísticas del empleado si estaba aprobado
-            if (employeeIndex !== -1 && record.status === 'aprobada') {
-                employees[employeeIndex].overtime -= record.hours;
-                employees[employeeIndex].overtimeAmount -= record.amount;
+            if (empIdx !== -1 && counts) {
+                employees[empIdx].overtime -= record.hours;
+                employees[empIdx].overtimeAmount -= record.amount;
             }
-            
-            // Guardar datos
             saveData();
-            
             showNotification('Registro eliminado correctamente', 'success');
             loadDashboardData();
             loadEmployeesTable();
         }
-    }
+    });
 }
 
 // Abrir modal de empleado
@@ -773,6 +1161,7 @@ function openEmployeeModal(employee = null) {
     const modal = document.getElementById('employee-modal');
     const form = document.getElementById('employee-form');
     const modalTitle = modal.querySelector('h3');
+    clearFieldErrors('employee-form');
     
     if (employee) {
         // Modo edición
@@ -797,16 +1186,47 @@ function openEmployeeModal(employee = null) {
 
 // Guardar empleado
 function saveEmployee() {
+    clearFieldErrors('employee-form');
+
     const form = document.getElementById('employee-form');
-    
+    const currentId = form.dataset.id ? parseInt(form.dataset.id) : null;
+    const email = document.getElementById('employee-email').value.trim();
+    const hourlyRate = parseFloat(document.getElementById('employee-hourly-rate').value);
+
+    let hasErrors = false;
+
+    // Validar formato de email
+    if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showFieldError('employee-email', 'El formato del email no es válido');
+            hasErrors = true;
+        } else {
+            // Detectar email duplicado
+            const duplicate = employees.find(emp => emp.email === email && emp.id !== currentId);
+            if (duplicate) {
+                showFieldError('employee-email', `Este email ya está registrado (${duplicate.name})`);
+                hasErrors = true;
+            }
+        }
+    }
+
+    // Validar tarifa
+    if (!hourlyRate || hourlyRate <= 0) {
+        showFieldError('employee-hourly-rate', 'La tarifa debe ser mayor que cero');
+        hasErrors = true;
+    }
+
+    if (hasErrors) return;
+
     const employeeData = {
-        id: form.dataset.id ? parseInt(form.dataset.id) : currentEmployeeId++,
+        id: currentId ?? currentEmployeeId++,
         name: document.getElementById('employee-name').value,
         department: document.getElementById('employee-department').value,
-        email: document.getElementById('employee-email').value,
+        email: email,
         phone: document.getElementById('employee-phone').value,
         position: document.getElementById('employee-position').value,
-        hourlyRate: parseFloat(document.getElementById('employee-hourly-rate').value),
+        hourlyRate: hourlyRate,
         overtime: 0,
         overtimeAmount: 0,
         lastOvertime: null
@@ -840,12 +1260,57 @@ function saveEmployee() {
     loadEmployeeSelect();
 }
 
-// Ver empleado
+// Ver empleado — abre modal de ficha
 function viewEmployee(id) {
     const employee = employees.find(emp => emp.id === id);
-    if (employee) {
-        alert(`Información del empleado:\n\nNombre: ${employee.name}\nDepartamento: ${employee.department}\nCargo: ${employee.position}\nEmail: ${employee.email}\nTeléfono: ${employee.phone}\nTarifa hora extra: €${employee.hourlyRate.toFixed(2)}\nHoras extras acumuladas: ${employee.overtime}\nImporte total: €${employee.overtimeAmount.toFixed(2)}`);
+    if (!employee) return;
+
+    // Iniciales para el avatar
+    const initials = employee.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    document.getElementById('view-avatar-initials').textContent = initials;
+    document.getElementById('view-employee-name').textContent = employee.name;
+    document.getElementById('view-employee-dept').textContent = employee.department;
+    document.getElementById('view-employee-position').textContent = employee.position || '—';
+    document.getElementById('view-employee-email').textContent = employee.email || '—';
+    document.getElementById('view-employee-phone').textContent = employee.phone || '—';
+    document.getElementById('view-employee-rate').textContent = `€${employee.hourlyRate.toFixed(2)}/h`;
+    document.getElementById('view-employee-hours').textContent = `${employee.overtime.toFixed(1)} h`;
+    document.getElementById('view-employee-amount').textContent = `€${employee.overtimeAmount.toFixed(2)}`;
+
+    // Pendiente de pago: suma de registros "aprobada" (no pagados aún)
+    const pending = overtimeRecords
+        .filter(r => r.employeeId === id && r.status === 'aprobada')
+        .reduce((sum, r) => sum + r.amount, 0);
+    document.getElementById('view-employee-pending').textContent = `€${pending.toFixed(2)}`;
+
+    // Últimos 6 registros del empleado
+    const tbody = document.getElementById('view-employee-records-body');
+    tbody.innerHTML = '';
+    const records = overtimeRecords
+        .filter(r => r.employeeId === id)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 6);
+
+    if (records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light);font-style:italic">Sin registros</td></tr>`;
+    } else {
+        records.forEach(r => {
+            const statusLabels = { pendiente: 'Pendiente', aprobada: 'Aprobada', pagada: 'Pagada', rechazada: 'Rechazada' };
+            const statusClasses = { pendiente: 'status-pendiente', aprobada: 'status-aprobada', pagada: 'status-pagada', rechazada: 'status-rechazada' };
+            const date = new Date(r.date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${date}</td>
+                <td>${r.hours} h</td>
+                <td>€${r.amount.toFixed(2)}</td>
+                <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.reason}">${r.reason}</td>
+                <td><span class="status-badge ${statusClasses[r.status] || ''}">${statusLabels[r.status] || r.status}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
     }
+
+    document.getElementById('employee-view-modal').classList.add('active');
 }
 
 // Editar empleado
@@ -858,31 +1323,31 @@ function editEmployee(id) {
 
 // Eliminar empleado
 function deleteEmployee(id) {
-    if (confirm('¿Está seguro de que desea eliminar este empleado?\n\nNota: Esta acción también eliminará todos sus registros de horas extras.')) {
-        const employeeIndex = employees.findIndex(emp => emp.id === id);
-        
-        if (employeeIndex !== -1) {
-            // Obtener nombre del empleado para el mensaje
-            const employeeName = employees[employeeIndex].name;
-            
-            // Eliminar empleado
-            employees.splice(employeeIndex, 1);
-            
-            // Eliminar registros de horas extras del empleado
-            overtimeRecords = overtimeRecords.filter(record => record.employeeId !== id);
-            
-            // Guardar datos
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    const recordCount = overtimeRecords.filter(r => r.employeeId === id).length;
+
+    showConfirmModal({
+        title: `Eliminar empleado`,
+        message: `¿Eliminar a ${emp.name} (${emp.department})?`,
+        warning: recordCount > 0
+            ? `También se eliminarán ${recordCount} registro${recordCount !== 1 ? 's' : ''} de horas extras asociados. Esta acción no se puede deshacer.`
+            : 'Esta acción no se puede deshacer.',
+        confirmText: 'Eliminar empleado',
+        danger: true,
+        onConfirm: () => {
+            const idx = employees.findIndex(e => e.id === id);
+            if (idx === -1) return;
+            employees.splice(idx, 1);
+            overtimeRecords = overtimeRecords.filter(r => r.employeeId !== id);
+            if (overtimeFilterEmployeeId === String(id)) overtimeFilterEmployeeId = '';
             saveData();
-            
-            // Mostrar notificación
-            showNotification(`Empleado "${employeeName}" eliminado correctamente`, 'success');
-            
-            // Actualizar datos
+            showNotification(`Empleado "${emp.name}" eliminado correctamente`, 'success');
             loadDashboardData();
             loadEmployeesTable();
             loadEmployeeSelect();
         }
-    }
+    });
 }
 
 // Abrir modal de tarea Kanban
@@ -964,21 +1429,25 @@ function saveKanbanTask() {
 
 // Eliminar tarea Kanban
 function deleteKanbanTask(id) {
-    if (confirm('¿Está seguro de que desea eliminar esta tarea?')) {
-        const index = kanbanTasks.findIndex(task => task.id === id);
-        if (index !== -1) {
-            kanbanTasks.splice(index, 1);
-            
-            // Guardar datos
-            saveData();
-            
-            showNotification('Tarea eliminada correctamente', 'success');
-            
-            // Cerrar modal y actualizar panel Kanban
-            document.getElementById('kanban-modal').classList.remove('active');
-            loadKanbanBoard();
+    const task = kanbanTasks.find(t => t.id === id);
+    if (!task) return;
+
+    showConfirmModal({
+        title: 'Eliminar tarea',
+        message: `¿Eliminar "${task.title}"?`,
+        confirmText: 'Eliminar tarea',
+        danger: true,
+        onConfirm: () => {
+            const index = kanbanTasks.findIndex(t => t.id === id);
+            if (index !== -1) {
+                kanbanTasks.splice(index, 1);
+                saveData();
+                showNotification('Tarea eliminada correctamente', 'success');
+                document.getElementById('kanban-modal').classList.remove('active');
+                loadKanbanBoard();
+            }
         }
-    }
+    });
 }
 
 // Exportar a PDF
@@ -1086,10 +1555,11 @@ function prepareOvertimeDataForPDF() {
         let statusText = '';
         switch(record.status) {
             case 'pendiente': statusText = 'Pendiente'; break;
-            case 'aprobada': statusText = 'Aprobada'; break;
+            case 'aprobada':  statusText = 'Aprobada';  break;
+            case 'pagada':    statusText = 'Pagada';    break;
             case 'rechazada': statusText = 'Rechazada'; break;
         }
-        
+
         // Acortar motivo si es muy largo
         let motivo = record.reason;
         if (motivo.length > 50) {
@@ -1186,10 +1656,11 @@ function prepareOvertimeDataForExcel() {
         let statusText = '';
         switch(record.status) {
             case 'pendiente': statusText = 'Pendiente'; break;
-            case 'aprobada': statusText = 'Aprobada'; break;
+            case 'aprobada':  statusText = 'Aprobada';  break;
+            case 'pagada':    statusText = 'Pagada';    break;
             case 'rechazada': statusText = 'Rechazada'; break;
         }
-        
+
         return {
             "Empleado": record.employeeName,
             "Departamento": department,
@@ -1210,7 +1681,7 @@ function prepareDepartmentDataForExcel() {
     
     overtimeRecords.forEach(record => {
         const employee = employees.find(emp => emp.id === record.employeeId);
-        if (employee && record.status === 'aprobada') {
+        if (employee && (record.status === 'aprobada' || record.status === 'pagada')) {
             if (!departmentSummary[employee.department]) {
                 departmentSummary[employee.department] = { hours: 0, amount: 0 };
             }
@@ -1234,7 +1705,7 @@ function prepareEmployeeDataForExcel() {
     const employeeSummary = {};
     
     overtimeRecords.forEach(record => {
-        if (record.status === 'aprobada') {
+        if (record.status === 'aprobada' || record.status === 'pagada') {
             if (!employeeSummary[record.employeeName]) {
                 employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
             }
@@ -1242,7 +1713,7 @@ function prepareEmployeeDataForExcel() {
             employeeSummary[record.employeeName].amount += record.amount;
         }
     });
-    
+
     return Object.entries(employeeSummary)
         .map(([employee, data]) => ({
             "Empleado": employee,
@@ -1288,7 +1759,7 @@ function createDepartmentChart() {
     
     overtimeRecords.forEach(record => {
         const employee = employees.find(emp => emp.id === record.employeeId);
-        if (employee && record.status === 'aprobada') {
+        if (employee && (record.status === 'aprobada' || record.status === 'pagada')) {
             if (!departmentHours[employee.department]) {
                 departmentHours[employee.department] = 0;
             }
@@ -1497,7 +1968,7 @@ function createTopEmployeesChart() {
     const employeeSummary = {};
     
     overtimeRecords.forEach(record => {
-        if (record.status === 'aprobada') {
+        if (record.status === 'aprobada' || record.status === 'pagada') {
             if (!employeeSummary[record.employeeName]) {
                 employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
             }
@@ -1505,7 +1976,7 @@ function createTopEmployeesChart() {
             employeeSummary[record.employeeName].amount += record.amount;
         }
     });
-    
+
     if (Object.keys(employeeSummary).length === 0) {
         // Mostrar gráfico vacío con mensaje
         const container = document.getElementById('topEmployeesChart').parentElement;

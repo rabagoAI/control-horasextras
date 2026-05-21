@@ -113,19 +113,40 @@
                     </div>
                 </div>
                 
-                <!-- Tabla de horas extras recientes (más ancha) -->
+                <!-- Tabla de horas extras -->
                 <div class="card full-width">
                     <div class="card-header">
-                        <h3>Horas Extras Recientes</h3>
+                        <h3>Horas Extras</h3>
                         <button class="btn btn-primary" id="add-overtime-btn">
                             <i class="fas fa-plus"></i> Registrar Horas
                         </button>
                     </div>
                     <div class="card-body">
+                        <div class="overtime-filters">
+                            <select id="overtime-employee-filter">
+                                <option value="">Todos los empleados</option>
+                            </select>
+                            <select id="overtime-status-filter">
+                                <option value="">Todos los estados</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="aprobada">Aprobada</option>
+                                <option value="pagada">Pagada</option>
+                                <option value="rechazada">Rechazada</option>
+                            </select>
+                            <input type="date" id="overtime-date-from" title="Desde">
+                            <input type="date" id="overtime-date-to" title="Hasta">
+                            <div id="bulk-actions" class="bulk-actions">
+                                <span id="selected-count">0 seleccionados</span>
+                                <button class="btn btn-danger btn-sm" id="delete-selected-btn">
+                                    <i class="fas fa-trash"></i> Eliminar seleccionados
+                                </button>
+                            </div>
+                        </div>
                         <div class="table-container">
                             <table class="data-table">
                                 <thead>
                                     <tr>
+                                        <th style="width:40px"><input type="checkbox" id="select-all-overtime" title="Seleccionar todos"></th>
                                         <th>Empleado</th>
                                         <th>Fecha</th>
                                         <th>Horas</th>
@@ -141,6 +162,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="overtime-pagination" class="pagination-controls"></div>
                     </div>
                 </div>
             </section>
@@ -181,6 +203,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="employees-pagination" class="pagination-controls"></div>
                     </div>
                 </div>
             </section>
@@ -317,6 +340,26 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3><i class="fas fa-database"></i> Copia de Seguridad</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="export-options">
+                            <button class="btn btn-primary" id="export-backup-btn">
+                                <i class="fas fa-download"></i> Exportar backup JSON
+                            </button>
+                            <label class="btn btn-secondary" id="import-backup-label" style="cursor:pointer">
+                                <i class="fas fa-upload"></i> Importar backup JSON
+                                <input type="file" id="import-backup-input" accept=".json" style="display:none">
+                            </label>
+                        </div>
+                        <div class="export-info">
+                            <p><i class="fas fa-info-circle"></i> El backup guarda todos los datos (empleados, horas extras y tareas Kanban) en un archivo JSON. Úsalo para hacer copias de seguridad o mover los datos a otro navegador.</p>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
         
@@ -361,6 +404,7 @@
                             <select id="overtime-status">
                                 <option value="pendiente">Pendiente</option>
                                 <option value="aprobada">Aprobada</option>
+                                <option value="pagada">Pagada</option>
                                 <option value="rechazada">Rechazada</option>
                             </select>
                         </div>
@@ -488,6 +532,84 @@
             </div>
         </div>
         
+        <!-- Modal de confirmación genérico -->
+        <div id="confirm-modal" class="modal">
+            <div class="modal-content modal-confirm">
+                <div class="confirm-icon-wrapper" id="confirm-icon-wrapper">
+                    <i class="fas fa-trash-alt" id="confirm-icon"></i>
+                </div>
+                <h3 id="confirm-title">¿Estás seguro?</h3>
+                <p id="confirm-message"></p>
+                <div id="confirm-warning" class="confirm-warning" style="display:none"></div>
+                <div class="form-actions" style="justify-content:center;gap:12px">
+                    <button class="btn btn-secondary" id="confirm-cancel-btn">Cancelar</button>
+                    <button class="btn btn-danger" id="confirm-ok-btn">Eliminar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para ver ficha del empleado -->
+        <div id="employee-view-modal" class="modal">
+            <div class="modal-content modal-content-wide">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user"></i> Ficha del Empleado</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="employee-view-top">
+                        <div class="employee-view-avatar" id="view-avatar-initials"></div>
+                        <div class="employee-view-identity">
+                            <h2 id="view-employee-name"></h2>
+                            <span class="status-badge status-aprobada" id="view-employee-dept"></span>
+                        </div>
+                    </div>
+                    <div class="employee-view-grid">
+                        <div class="employee-view-info">
+                            <h4><i class="fas fa-address-card"></i> Información de contacto</h4>
+                            <div class="employee-view-row"><i class="fas fa-briefcase"></i><span id="view-employee-position"></span></div>
+                            <div class="employee-view-row"><i class="fas fa-envelope"></i><span id="view-employee-email"></span></div>
+                            <div class="employee-view-row"><i class="fas fa-phone"></i><span id="view-employee-phone"></span></div>
+                        </div>
+                        <div class="employee-view-stats">
+                            <div class="view-stat">
+                                <span class="view-stat-label">Tarifa hora extra</span>
+                                <span class="view-stat-value" id="view-employee-rate"></span>
+                            </div>
+                            <div class="view-stat">
+                                <span class="view-stat-label">Horas acumuladas</span>
+                                <span class="view-stat-value" id="view-employee-hours"></span>
+                            </div>
+                            <div class="view-stat">
+                                <span class="view-stat-label">Importe total</span>
+                                <span class="view-stat-value" id="view-employee-amount"></span>
+                            </div>
+                            <div class="view-stat view-stat-highlight">
+                                <span class="view-stat-label">Pendiente de pago</span>
+                                <span class="view-stat-value" id="view-employee-pending"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="employee-view-records">
+                        <h4><i class="fas fa-history"></i> Últimos registros</h4>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Horas</th>
+                                        <th>Total</th>
+                                        <th>Motivo</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="view-employee-records-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <footer class="main-footer">
             <p>© 2023 Gestor de Horas Extras - Todos los derechos reservados</p>
             <p class="footer-links">
