@@ -56,9 +56,9 @@
             <section id="dashboard" class="content-section active">
                 <div class="section-header">
                     <h2><i class="fas fa-home"></i> Dashboard</h2>
-                    <p>Resumen de horas extras y actividades recientes</p>
+                    <p>Resumen de horas extras y actividades recientes. Las tarjetas reflejan los filtros de la tabla "Horas Extras" (empleado, estado y fechas) — por defecto, el mes actual.</p>
                 </div>
-                
+
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon" style="background-color: #4A6FA5;">
@@ -87,6 +87,7 @@
                         <div class="stat-info">
                             <h3>Pendientes de Aprobación</h3>
                             <p class="stat-value" id="pending-approvals">8</p>
+                            <span class="stat-note">Sin filtrar</span>
                         </div>
                     </div>
                     
@@ -109,6 +110,11 @@
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="departmentChart"></canvas>
+                            <div id="departmentChart-empty" class="chart-empty-state" style="display:none;">
+                                <i class="fas fa-chart-pie"></i>
+                                No hay horas extras que coincidan con los filtros actuales.
+                                <br>Ajusta los filtros de la tabla o registra horas para ver la distribución.
+                            </div>
                         </div>
                     </div>
                 </div>

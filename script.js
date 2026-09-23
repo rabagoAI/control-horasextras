@@ -118,7 +118,14 @@ function initializeApp() {
     
     // Cargar datos guardados del localStorage
     loadSavedData();
-    
+
+    // Por defecto, la tabla (y por tanto las tarjetas) muestran el mes actual
+    const { from, to } = getCurrentMonthRange();
+    overtimeFilterDateFrom = from;
+    overtimeFilterDateTo = to;
+    document.getElementById('overtime-date-from').value = from;
+    document.getElementById('overtime-date-to').value = to;
+
     // Cargar datos iniciales
     loadDashboardData();
     loadEmployeesTable();
@@ -146,6 +153,9 @@ function initializeApp() {
 
     // Configurar botones de exportación
     setupExportButtons();
+
+    // Configurar selector de periodo de los gráficos de Reportes
+    setupReportPeriodFilter();
 }
 
 // Cargar datos guardados del localStorage
@@ -274,37 +284,38 @@ function setupNavigation() {
     });
 }
 
-// Cargar datos del dashboard
-function loadDashboardData() {
-    // Calcular estadísticas (manejar arrays vacíos)
-    const totalEmployees = employees.length;
-    const totalOvertime = overtimeRecords
-        .filter(record => record.status === 'aprobada' || record.status === 'pagada')
-        .reduce((sum, record) => sum + record.hours, 0);
-    const pendingApprovals = overtimeRecords.filter(record => record.status === 'pendiente').length;
-    const totalPay = overtimeRecords
-        .filter(record => record.status === 'aprobada')
-        .reduce((sum, record) => sum + record.amount, 0);
-    
-    // Actualizar valores en el DOM
-    document.getElementById('total-employees').textContent = totalEmployees;
-    document.getElementById('total-overtime').textContent = totalOvertime.toFixed(1);
-    document.getElementById('pending-approvals').textContent = pendingApprovals;
-    document.getElementById('total-pay').textContent = totalPay.toLocaleString('es-ES', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-    
-    // Cargar tabla de horas extras recientes
-    loadOvertimeTable();
+// Estados que cuentan como horas ya reconocidas (aprobadas o ya pagadas)
+const RECOGNIZED_OVERTIME_STATUSES = ['aprobada', 'pagada'];
+
+// Recalcula overtime/overtimeAmount/lastOvertime de un empleado a partir de sus registros reales.
+// Única fuente de verdad para estos totales: evita mantener sumas/restas manuales duplicadas en
+// cada punto de alta, edición o baja de un registro (y el desfase que eso puede producir con el tiempo).
+function recalculateEmployeeStats(employeeId) {
+    const employee = employees.find(e => e.id === employeeId);
+    if (!employee) return;
+    const recognized = overtimeRecords.filter(r =>
+        r.employeeId === employeeId && RECOGNIZED_OVERTIME_STATUSES.includes(r.status)
+    );
+    employee.overtime = recognized.reduce((sum, r) => sum + r.hours, 0);
+    employee.overtimeAmount = recognized.reduce((sum, r) => sum + r.amount, 0);
+    employee.lastOvertime = recognized.length > 0
+        ? recognized.reduce((latest, r) => (r.date > latest ? r.date : latest), recognized[0].date)
+        : null;
 }
 
-// Cargar tabla de horas extras
-function loadOvertimeTable() {
-    const tableBody = document.getElementById('overtime-table');
-    tableBody.innerHTML = '';
+// Primer y último día (YYYY-MM-DD) del mes actual, usados como rango por defecto
+function getCurrentMonthRange() {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const pad = n => String(n).padStart(2, '0');
+    const from = `${y}-${pad(m + 1)}-01`;
+    const to = `${y}-${pad(m + 1)}-${pad(new Date(y, m + 1, 0).getDate())}`;
+    return { from, to };
+}
 
-    // Aplicar filtros
+// Registros de horas extras según los filtros de la tabla (empleado, estado, fechas):
+// única fuente de verdad, usada tanto por la tabla como por las tarjetas del Dashboard
+function getFilteredOvertimeRecords() {
     let filteredRecords = [...overtimeRecords];
     if (overtimeFilterEmployeeId) {
         filteredRecords = filteredRecords.filter(r => r.employeeId === parseInt(overtimeFilterEmployeeId));
@@ -318,6 +329,52 @@ function loadOvertimeTable() {
     if (overtimeFilterDateTo) {
         filteredRecords = filteredRecords.filter(r => r.date <= overtimeFilterDateTo);
     }
+    return filteredRecords;
+}
+
+// Cargar datos del dashboard (tarjetas KPI), sincronizadas con los filtros de la tabla de abajo
+function loadDashboardData() {
+    const totalEmployees = employees.length;
+    const filteredRecords = getFilteredOvertimeRecords();
+
+    // Si el usuario no ha elegido un estado concreto, "Horas Extras" solo cuenta
+    // lo ya reconocido (aprobada/pagada); si ha filtrado por un estado, se respeta ese filtro tal cual
+    // (filteredRecords ya viene acotado a ese estado desde getFilteredOvertimeRecords).
+    const totalOvertime = filteredRecords
+        .filter(record => overtimeFilterStatus || RECOGNIZED_OVERTIME_STATUSES.includes(record.status))
+        .reduce((sum, record) => sum + record.hours, 0);
+
+    // "Total a Pagar": sin filtro de estado, solo lo aprobado aún no pagado; con filtro, respeta ese filtro.
+    const totalPay = filteredRecords
+        .filter(record => overtimeFilterStatus || record.status === 'aprobada')
+        .reduce((sum, record) => sum + record.amount, 0);
+
+    // "Pendientes de Aprobación" es intencionalmente global (no usa los filtros de la tabla):
+    // son acciones que requieren atención, no un total del periodo/vista actual.
+    const pendingApprovals = overtimeRecords.filter(record => record.status === 'pendiente').length;
+
+    // Actualizar valores en el DOM
+    document.getElementById('total-employees').textContent = totalEmployees;
+    document.getElementById('total-overtime').textContent = totalOvertime.toFixed(1);
+    document.getElementById('pending-approvals').textContent = pendingApprovals;
+    document.getElementById('total-pay').textContent = totalPay.toLocaleString('es-ES', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
+    // Cargar tabla de horas extras recientes y el gráfico de departamentos (mismos filtros)
+    loadOvertimeTable();
+    if (document.getElementById('departmentChart')) {
+        createDepartmentChart();
+    }
+}
+
+// Cargar tabla de horas extras
+function loadOvertimeTable() {
+    const tableBody = document.getElementById('overtime-table');
+    tableBody.innerHTML = '';
+
+    let filteredRecords = getFilteredOvertimeRecords();
 
     if (filteredRecords.length === 0) {
         const row = document.createElement('tr');
@@ -438,13 +495,13 @@ function setupOvertimeFilters() {
     employeeFilter.addEventListener('change', function() {
         overtimeFilterEmployeeId = this.value;
         overtimeCurrentPage = 1;
-        loadOvertimeTable();
+        loadDashboardData();
     });
 
     statusFilter.addEventListener('change', function() {
         overtimeFilterStatus = this.value;
         overtimeCurrentPage = 1;
-        loadOvertimeTable();
+        loadDashboardData();
     });
 
     selectAll.addEventListener('change', function() {
@@ -457,13 +514,23 @@ function setupOvertimeFilters() {
     document.getElementById('overtime-date-from').addEventListener('change', function() {
         overtimeFilterDateFrom = this.value;
         overtimeCurrentPage = 1;
-        loadOvertimeTable();
+        loadDashboardData();
     });
 
     document.getElementById('overtime-date-to').addEventListener('change', function() {
         overtimeFilterDateTo = this.value;
         overtimeCurrentPage = 1;
-        loadOvertimeTable();
+        loadDashboardData();
+    });
+}
+
+// Configurar el selector "Últimos X meses" de los gráficos mensuales de Reportes
+function setupReportPeriodFilter() {
+    const select = document.getElementById('report-period');
+    if (!select) return;
+    select.addEventListener('change', function() {
+        createMonthlyChart();
+        createAmountChart();
     });
 }
 
@@ -482,13 +549,11 @@ function deleteSelectedOvertimes() {
         confirmText: `Eliminar ${count}`,
         danger: true,
         onConfirm: () => {
-            overtimeRecords
-                .filter(r => ids.has(r.id) && (r.status === 'aprobada' || r.status === 'pagada'))
-                .forEach(record => {
-                    const emp = employees.find(e => e.id === record.employeeId);
-                    if (emp) { emp.overtime -= record.hours; emp.overtimeAmount -= record.amount; }
-                });
+            const affectedEmployeeIds = new Set(
+                overtimeRecords.filter(r => ids.has(r.id)).map(r => r.employeeId)
+            );
             overtimeRecords = overtimeRecords.filter(r => !ids.has(r.id));
+            affectedEmployeeIds.forEach(recalculateEmployeeStats);
             saveData();
             showNotification(`${count} registro${count !== 1 ? 's eliminados' : ' eliminado'} correctamente`, 'success');
             loadDashboardData();
@@ -1071,41 +1136,19 @@ function saveOvertime() {
         // Actualizar registro existente
         const index = overtimeRecords.findIndex(record => record.id === overtimeData.id);
         if (index !== -1) {
-            // Obtener el registro anterior
-            const oldRecord = overtimeRecords[index];
-            
-            // Actualizar estadísticas del empleado
-            const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
-            if (employeeIndex !== -1) {
-                const oldCounts = oldRecord.status === 'aprobada' || oldRecord.status === 'pagada';
-                const newCounts = overtimeData.status === 'aprobada' || overtimeData.status === 'pagada';
-                if (oldCounts && newCounts) {
-                    employees[employeeIndex].overtime += (overtimeData.hours - oldRecord.hours);
-                    employees[employeeIndex].overtimeAmount += (overtimeData.amount - oldRecord.amount);
-                } else if (oldCounts && !newCounts) {
-                    employees[employeeIndex].overtime -= oldRecord.hours;
-                    employees[employeeIndex].overtimeAmount -= oldRecord.amount;
-                } else if (!oldCounts && newCounts) {
-                    employees[employeeIndex].overtime += overtimeData.hours;
-                    employees[employeeIndex].overtimeAmount += overtimeData.amount;
-                }
-            }
-            
+            const oldEmployeeId = overtimeRecords[index].employeeId;
             overtimeRecords[index] = overtimeData;
+
+            // Recalcular estadísticas del empleado (y del anterior, si se reasignó el registro a otro empleado)
+            recalculateEmployeeStats(employeeId);
+            if (oldEmployeeId !== employeeId) recalculateEmployeeStats(oldEmployeeId);
+
             showNotification('Horas extras actualizadas correctamente', 'success');
         }
     } else {
         // Agregar nuevo registro
         overtimeRecords.push(overtimeData);
-        
-        // Actualizar horas acumuladas del empleado si está aprobado o pagado
-        const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
-        if (employeeIndex !== -1 && (overtimeData.status === 'aprobada' || overtimeData.status === 'pagada')) {
-            employees[employeeIndex].overtime += overtimeData.hours;
-            employees[employeeIndex].overtimeAmount += overtimeData.amount;
-            employees[employeeIndex].lastOvertime = overtimeData.date;
-        }
-        
+        recalculateEmployeeStats(employeeId);
         showNotification('Horas extras registradas correctamente', 'success');
     }
     
@@ -1131,7 +1174,7 @@ function deleteOvertime(id) {
     const record = overtimeRecords.find(r => r.id === id);
     if (!record) return;
     const dateStr = new Date(record.date + 'T12:00:00').toLocaleDateString('es-ES');
-    const counts = record.status === 'aprobada' || record.status === 'pagada';
+    const counts = RECOGNIZED_OVERTIME_STATUSES.includes(record.status);
 
     showConfirmModal({
         title: 'Eliminar registro',
@@ -1142,12 +1185,8 @@ function deleteOvertime(id) {
         onConfirm: () => {
             const index = overtimeRecords.findIndex(r => r.id === id);
             if (index === -1) return;
-            const empIdx = employees.findIndex(e => e.id === record.employeeId);
             overtimeRecords.splice(index, 1);
-            if (empIdx !== -1 && counts) {
-                employees[empIdx].overtime -= record.hours;
-                employees[empIdx].overtimeAmount -= record.amount;
-            }
+            recalculateEmployeeStats(record.employeeId);
             saveData();
             showNotification('Registro eliminado correctamente', 'success');
             loadDashboardData();
@@ -1681,7 +1720,7 @@ function prepareDepartmentDataForExcel() {
     
     overtimeRecords.forEach(record => {
         const employee = employees.find(emp => emp.id === record.employeeId);
-        if (employee && (record.status === 'aprobada' || record.status === 'pagada')) {
+        if (employee && RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
             if (!departmentSummary[employee.department]) {
                 departmentSummary[employee.department] = { hours: 0, amount: 0 };
             }
@@ -1705,7 +1744,7 @@ function prepareEmployeeDataForExcel() {
     const employeeSummary = {};
     
     overtimeRecords.forEach(record => {
-        if (record.status === 'aprobada' || record.status === 'pagada') {
+        if (RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
             if (!employeeSummary[record.employeeName]) {
                 employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
             }
@@ -1750,41 +1789,50 @@ function loadCharts() {
     }
 }
 
-// Crear gráfico de horas por departamento
+// Departamentos disponibles; debe coincidir con las opciones de #employee-department
+const ALL_DEPARTMENTS = ['Ventas', 'Marketing', 'TI', 'RRHH', 'Finanzas', 'Operaciones'];
+let departmentChartInstance = null;
+
+// Crear gráfico de horas por departamento (sincronizado con los filtros de la tabla de Horas Extras)
 function createDepartmentChart() {
-    const ctx = document.getElementById('departmentChart').getContext('2d');
-    
-    // Calcular horas por departamento
+    const canvas = document.getElementById('departmentChart');
+    const emptyState = document.getElementById('departmentChart-empty');
+    if (!canvas) return;
+
+    // Horas por departamento dentro de los filtros activos, con el mismo criterio
+    // de estado que la tarjeta "Horas Extras" (recognized, salvo que el usuario filtre por un estado concreto)
     const departmentHours = {};
-    
-    overtimeRecords.forEach(record => {
+    ALL_DEPARTMENTS.forEach(dep => { departmentHours[dep] = 0; });
+
+    getFilteredOvertimeRecords().forEach(record => {
         const employee = employees.find(emp => emp.id === record.employeeId);
-        if (employee && (record.status === 'aprobada' || record.status === 'pagada')) {
-            if (!departmentHours[employee.department]) {
-                departmentHours[employee.department] = 0;
-            }
+        if (!employee) return;
+        if (overtimeFilterStatus || RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
+            if (!(employee.department in departmentHours)) departmentHours[employee.department] = 0;
             departmentHours[employee.department] += record.hours;
         }
     });
-    
+
     const departments = Object.keys(departmentHours);
-    const hours = Object.values(departmentHours);
-    
-    if (departments.length === 0) {
-        // Mostrar gráfico vacío con mensaje
-        const container = document.getElementById('departmentChart').parentElement;
-        container.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: var(--text-light); font-style: italic;">
-                <i class="fas fa-chart-pie" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
-                No hay datos suficientes para mostrar el gráfico de departamentos.
-                <br>Registre horas extras aprobadas para ver la distribución.
-            </div>
-        `;
+    const hours = departments.map(dep => departmentHours[dep]);
+    const totalHours = hours.reduce((sum, h) => sum + h, 0);
+
+    // Evitar el error de Chart.js "Canvas is already in use" al recrear el gráfico
+    if (departmentChartInstance) {
+        departmentChartInstance.destroy();
+        departmentChartInstance = null;
+    }
+
+    if (totalHours === 0) {
+        canvas.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'flex';
         return;
     }
-    
-    // Colores para los departamentos
-    const colors = [
+    canvas.style.display = '';
+    if (emptyState) emptyState.style.display = 'none';
+
+    // Colores vivos para departamentos con horas; gris apagado para los que no tienen (quedan en la leyenda)
+    const activeColors = [
         'rgba(74, 111, 165, 0.7)',
         'rgba(107, 142, 35, 0.7)',
         'rgba(218, 165, 32, 0.7)',
@@ -1792,17 +1840,21 @@ function createDepartmentChart() {
         'rgba(72, 61, 139, 0.7)',
         'rgba(220, 53, 69, 0.7)'
     ];
-    
-    new Chart(ctx, {
+    const isDark = document.body.classList.contains('dark-mode');
+    const emptyColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const backgroundColor = departments.map((dep, i) =>
+        departmentHours[dep] > 0 ? activeColors[i % activeColors.length] : emptyColor
+    );
+
+    const ctx = canvas.getContext('2d');
+    departmentChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: departments,
             datasets: [{
                 data: hours,
-                backgroundColor: colors.slice(0, departments.length),
-                borderColor: document.body.classList.contains('dark-mode') ? 
-                    ['#2c3e50', '#2c3e50', '#2c3e50', '#2c3e50', '#2c3e50', '#2c3e50'] : 
-                    ['#fff', '#fff', '#fff', '#fff', '#fff', '#fff'],
+                backgroundColor: backgroundColor,
+                borderColor: isDark ? '#2c3e50' : '#fff',
                 borderWidth: 2
             }]
         },
@@ -1813,7 +1865,7 @@ function createDepartmentChart() {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                        color: isDark ? '#E0E0E0' : '#333',
                         padding: 20,
                         font: {
                             size: 12,
@@ -1824,7 +1876,7 @@ function createDepartmentChart() {
                 title: {
                     display: true,
                     text: 'Horas Extras por Departamento',
-                    color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                    color: isDark ? '#E0E0E0' : '#333',
                     font: {
                         size: 16,
                         weight: 'bold'
@@ -1835,15 +1887,46 @@ function createDepartmentChart() {
     });
 }
 
+// Horas e importe reales (horas reconocidas: aprobada/pagada) de los últimos N meses, incluido el actual
+function getMonthlyOvertimeSummary(numMonths) {
+    const now = new Date();
+    const buckets = [];
+    for (let i = numMonths - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        let label = d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }).replace(/\.$/, '');
+        label = label.charAt(0).toUpperCase() + label.slice(1);
+        buckets.push({ key, label, hours: 0, amount: 0 });
+    }
+    const byKey = Object.fromEntries(buckets.map(b => [b.key, b]));
+    overtimeRecords.forEach(record => {
+        if (!RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) return;
+        const bucket = byKey[record.date.slice(0, 7)];
+        if (bucket) {
+            bucket.hours += record.hours;
+            bucket.amount += record.amount;
+        }
+    });
+    return buckets;
+}
+
+// Número de meses seleccionado en el desplegable "Últimos X meses" de Reportes
+function getReportPeriodMonths() {
+    const select = document.getElementById('report-period');
+    return select ? parseInt(select.value, 10) || 3 : 3;
+}
+
 // Crear gráfico de horas mensuales
+let monthlyChartInstance = null;
 function createMonthlyChart() {
     const ctx = document.getElementById('monthlyChart').getContext('2d');
-    
-    // Datos de ejemplo para los últimos 6 meses
-    const months = ['May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct'];
-    const hours = [45, 62, 78, 95, 110, 147.5];
-    
-    new Chart(ctx, {
+
+    const summary = getMonthlyOvertimeSummary(getReportPeriodMonths());
+    const months = summary.map(b => b.label);
+    const hours = summary.map(b => b.hours);
+
+    if (monthlyChartInstance) { monthlyChartInstance.destroy(); monthlyChartInstance = null; }
+    monthlyChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: months,
@@ -1899,14 +1982,16 @@ function createMonthlyChart() {
 }
 
 // Crear gráfico de importe por mes
+let amountChartInstance = null;
 function createAmountChart() {
     const ctx = document.getElementById('amountChart').getContext('2d');
-    
-    // Datos de ejemplo para los últimos 6 meses
-    const months = ['May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct'];
-    const amounts = [2250, 3100, 3900, 4750, 5500, 7375];
-    
-    new Chart(ctx, {
+
+    const summary = getMonthlyOvertimeSummary(getReportPeriodMonths());
+    const months = summary.map(b => b.label);
+    const amounts = summary.map(b => b.amount);
+
+    if (amountChartInstance) { amountChartInstance.destroy(); amountChartInstance = null; }
+    amountChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: months,
@@ -1961,6 +2046,7 @@ function createAmountChart() {
 }
 
 // Crear gráfico de top empleados por importe
+let topEmployeesChartInstance = null;
 function createTopEmployeesChart() {
     const ctx = document.getElementById('topEmployeesChart').getContext('2d');
     
@@ -1968,7 +2054,7 @@ function createTopEmployeesChart() {
     const employeeSummary = {};
     
     overtimeRecords.forEach(record => {
-        if (record.status === 'aprobada' || record.status === 'pagada') {
+        if (RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
             if (!employeeSummary[record.employeeName]) {
                 employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
             }
@@ -1998,8 +2084,9 @@ function createTopEmployeesChart() {
     
     const employeeNames = employeeArray.map(emp => emp.name);
     const employeeAmounts = employeeArray.map(emp => emp.amount);
-    
-    new Chart(ctx, {
+
+    if (topEmployeesChartInstance) { topEmployeesChartInstance.destroy(); topEmployeesChartInstance = null; }
+    topEmployeesChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: employeeNames,
