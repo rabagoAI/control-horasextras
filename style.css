@@ -435,6 +435,18 @@ body {
     color: #0c5460;
 }
 
+.dark-mode .status-pendiente {
+    color: #ffd866;
+}
+
+.dark-mode .status-aprobada {
+    color: #7ee2a0;
+}
+
+.dark-mode .status-rechazada {
+    color: #ff9aa5;
+}
+
 .dark-mode .status-pagada {
     color: #7ee8f5;
 }
