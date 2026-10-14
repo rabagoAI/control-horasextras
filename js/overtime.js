@@ -211,6 +211,16 @@ function setupOvertimeFilters() {
 
     deleteSelectedBtn.addEventListener('click', deleteSelectedOvertimes);
 
+    const bulkStatusSelect = document.getElementById('bulk-status-select');
+    Object.entries(OVERTIME_STATUSES).forEach(([value, { label }]) => {
+        bulkStatusSelect.add(new Option(label, value));
+    });
+    bulkStatusSelect.addEventListener('change', function() {
+        const newStatus = this.value;
+        this.value = '';
+        if (newStatus) changeSelectedStatus(newStatus);
+    });
+
     document.getElementById('overtime-date-from').addEventListener('change', function() {
         overtimeFilterDateFrom = this.value;
         overtimeCurrentPage = 1;
@@ -252,6 +262,60 @@ function deleteSelectedOvertimes() {
     });
 }
 
+function changeSelectedStatus(newStatus) {
+    const ids = new Set(Array.from(document.querySelectorAll('.overtime-checkbox:checked')).map(cb => parseInt(cb.dataset.id)));
+    const toChange = overtimeRecords.filter(r => ids.has(r.id) && r.status !== newStatus);
+    const label = statusLabel(newStatus);
+
+    if (toChange.length === 0) {
+        showNotification(`Los registros seleccionados ya están en estado "${label}"`, 'info');
+        return;
+    }
+
+    // Horas que pasarían a computar para el tope anual, por empleado y año
+    const limitWarnings = [];
+    if (OVERTIME_STATUSES[newStatus].countsTowardLimit) {
+        const added = {};
+        toChange.filter(r => !OVERTIME_STATUSES[r.status]?.countsTowardLimit).forEach(r => {
+            const key = `${r.employeeId}|${r.date.slice(0, 4)}`;
+            added[key] = (added[key] || 0) + r.hours;
+        });
+        Object.entries(added).forEach(([key, hours]) => {
+            const [employeeId, year] = key.split('|');
+            const total = getAnnualLimitHours(parseInt(employeeId), year) + hours;
+            if (total > ANNUAL_OVERTIME_LIMIT) {
+                const name = employees.find(e => e.id === parseInt(employeeId))?.name || 'Empleado';
+                limitWarnings.push(`${name}: ${formatHours(total)} en ${year}`);
+            }
+        });
+    }
+
+    const count = toChange.length;
+    const skipped = ids.size - count;
+    showConfirmModal({
+        title: `Cambiar estado a "${label}"`,
+        message: `Se cambiará el estado de ${count} registro${count !== 1 ? 's' : ''}` +
+            (skipped > 0 ? ` (${skipped} ya estaba${skipped !== 1 ? 'n' : ''} en "${label}")` : '') + '.',
+        warning: limitWarnings.length > 0
+            ? `Superarán el máximo legal de ${ANNUAL_OVERTIME_LIMIT} h/año: ${limitWarnings.join('; ')}.`
+            : '',
+        confirmText: 'Cambiar estado',
+        danger: false,
+        onConfirm: () => {
+            const at = new Date().toISOString();
+            toChange.forEach(r => {
+                r.history = [...(Array.isArray(r.history) ? r.history : []), { at, from: r.status, to: newStatus }];
+                r.status = newStatus;
+            });
+            new Set(toChange.map(r => r.employeeId)).forEach(recalculateEmployeeStats);
+            saveData();
+            showNotification(`${count} registro${count !== 1 ? 's' : ''} cambiado${count !== 1 ? 's' : ''} a "${label}"`, 'success');
+            loadDashboardData();
+            loadEmployeesTable();
+        }
+    });
+}
+
 // Cargar select de empleados
 function loadEmployeeSelect() {
     const select = document.getElementById('employee-select');
@@ -285,7 +349,9 @@ function openOvertimeModal(overtime = null) {
         document.getElementById('overtime-rate').value = overtime.rate;
         document.getElementById('overtime-reason').value = overtime.reason;
         document.getElementById('overtime-status').value = overtime.status;
+        renderStatusHistory(overtime);
     } else {
+        document.getElementById('overtime-history').hidden = true;
         // Modo creación
         modalTitle.innerHTML = '<i class="fas fa-clock"></i> Registrar Horas Extras';
         form.reset();
@@ -298,6 +364,27 @@ function openOvertimeModal(overtime = null) {
     }
 
     modal.classList.add('active');
+}
+
+function renderStatusHistory(record) {
+    const list = document.getElementById('overtime-history-list');
+    const history = Array.isArray(record.history) ? [...record.history].reverse() : [];
+
+    if (history.length === 0) {
+        list.innerHTML = '<li class="status-history-empty">Sin historial: el registro es anterior a esta función.</li>';
+    } else {
+        list.innerHTML = history.map(entry => {
+            const when = new Date(entry.at);
+            const whenText = isNaN(when) ? '—' : when.toLocaleString('es-ES', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            const change = entry.from
+                ? `${statusBadgeHtml(entry.from)} <i class="fas fa-arrow-right"></i> ${statusBadgeHtml(entry.to)}`
+                : `Creado como ${statusBadgeHtml(entry.to)}`;
+            return `<li><time>${whenText}</time><span class="status-history-change">${change}</span></li>`;
+        }).join('');
+    }
+    document.getElementById('overtime-history').hidden = false;
 }
 
 // Guardar horas extras
@@ -392,12 +479,18 @@ function saveOvertime() {
 
 function commitOvertime(overtimeData, isEdit) {
     const employeeId = overtimeData.employeeId;
+    const now = new Date().toISOString();
 
     if (isEdit) {
         // Actualizar registro existente
         const index = overtimeRecords.findIndex(record => record.id === overtimeData.id);
         if (index !== -1) {
-            const oldEmployeeId = overtimeRecords[index].employeeId;
+            const old = overtimeRecords[index];
+            const oldEmployeeId = old.employeeId;
+            overtimeData.history = Array.isArray(old.history) ? [...old.history] : [];
+            if (old.status !== overtimeData.status) {
+                overtimeData.history.push({ at: now, from: old.status, to: overtimeData.status });
+            }
             overtimeRecords[index] = overtimeData;
 
             // Recalcular estadísticas del empleado (y del anterior, si se reasignó el registro a otro empleado)
@@ -408,6 +501,7 @@ function commitOvertime(overtimeData, isEdit) {
         }
     } else {
         // Agregar nuevo registro
+        overtimeData.history = [{ at: now, from: null, to: overtimeData.status }];
         overtimeRecords.push(overtimeData);
         recalculateEmployeeStats(employeeId);
         showNotification('Horas extras registradas correctamente', 'success');

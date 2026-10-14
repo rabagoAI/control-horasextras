@@ -635,6 +635,71 @@ body {
     }
 }
 
+/* Historial de cambios de estado (modal de edición de horas) */
+.status-history {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--bg-color);
+    border-radius: var(--border-radius-sm);
+}
+
+.status-history h4 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.status-history-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    color: var(--text-color);
+}
+
+.status-history-list li:last-child {
+    border-bottom: none;
+}
+
+.status-history-list time {
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+    min-width: 120px;
+}
+
+.status-history-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-history-change .fa-arrow-right {
+    font-size: 0.7rem;
+    color: var(--text-light);
+}
+
+.status-history-list .status-history-empty {
+    color: var(--text-light);
+    font-style: italic;
+}
+
 /* Límite legal anual de horas extra */
 .annual-limit {
     --limit-color: var(--primary-color);
@@ -1186,19 +1251,25 @@ body {
 
 .bulk-actions {
     display: none;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--spacing-sm);
     margin-left: auto;
-    background-color: rgba(220, 53, 69, 0.08);
+    background-color: rgba(74, 111, 165, 0.08);
     padding: 6px 14px;
     border-radius: var(--border-radius-sm);
-    border: 1px solid rgba(220, 53, 69, 0.25);
+    border: 1px solid rgba(74, 111, 165, 0.3);
 }
 
 .bulk-actions span {
     font-size: 0.9rem;
     font-weight: 500;
-    color: var(--danger-color);
+    color: var(--text-color);
+}
+
+.bulk-actions select {
+    padding: 5px 8px;
+    font-size: 0.85rem;
 }
 
 #select-all-overtime {

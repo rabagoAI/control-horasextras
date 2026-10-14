@@ -144,6 +144,9 @@
                             <input type="date" id="overtime-date-to" title="Hasta">
                             <div id="bulk-actions" class="bulk-actions">
                                 <span id="selected-count">0 seleccionados</span>
+                                <select id="bulk-status-select" aria-label="Cambiar estado de los seleccionados">
+                                    <option value="">Cambiar estado a…</option>
+                                </select>
                                 <button class="btn btn-danger btn-sm" id="delete-selected-btn">
                                     <i class="fas fa-trash"></i> Eliminar seleccionados
                                 </button>
@@ -416,6 +419,11 @@
                                 <option value="disfrutada">Disfrutada</option>
                                 <option value="rechazada">Rechazada</option>
                             </select>
+                        </div>
+
+                        <div class="status-history" id="overtime-history" hidden>
+                            <h4><i class="fas fa-history"></i> Historial de estado</h4>
+                            <ol class="status-history-list" id="overtime-history-list"></ol>
                         </div>
 
                         <div class="form-actions">
