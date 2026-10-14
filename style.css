@@ -966,7 +966,7 @@ body {
     gap: 10px;
 }
 
-.modal-close {
+.modal-close:not(.btn) {
     background: none;
     border: none;
     font-size: 1.8rem;
@@ -976,7 +976,7 @@ body {
     transition: var(--transition);
 }
 
-.modal-close:hover {
+.modal-close:not(.btn):hover {
     color: var(--danger-color);
 }
 
