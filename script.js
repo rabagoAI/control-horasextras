@@ -92,6 +92,15 @@ function renderPagination(containerId, currentPage, totalPages, totalItems, onPa
     container.querySelector(`#${containerId}-next`)?.addEventListener('click', () => onPageChange(currentPage + 1));
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ── Estado vacío ─────────────────────────────────────────────────────────────
 function emptyStateHtml(icon, title, desc, btnText = '', btnAction = '') {
     const btn = btnText
@@ -204,6 +213,9 @@ function loadSavedData() {
             kanbanTasks = [];
         }
     }
+
+    // Los totales guardados pueden venir de reglas de estado anteriores
+    employees.forEach(emp => recalculateEmployeeStats(emp.id));
 }
 
 // Guardar datos en localStorage
@@ -284,8 +296,35 @@ function setupNavigation() {
     });
 }
 
-// Estados que cuentan como horas ya reconocidas (aprobadas o ya pagadas)
-const RECOGNIZED_OVERTIME_STATUSES = ['aprobada', 'pagada'];
+// countsHours: suma en los totales de horas reconocidas. hasAmount: false = se compensa en tiempo, no en €.
+const OVERTIME_STATUSES = {
+    pendiente:  { label: 'Pendiente',  countsHours: false, hasAmount: true  },
+    aprobada:   { label: 'Aprobada',   countsHours: true,  hasAmount: true  },
+    pagada:     { label: 'Pagada',     countsHours: true,  hasAmount: true  },
+    disfrutada: { label: 'Disfrutada', countsHours: true,  hasAmount: false },
+    rechazada:  { label: 'Rechazada',  countsHours: false, hasAmount: true  },
+};
+
+function statusLabel(status) {
+    return OVERTIME_STATUSES[status]?.label || status;
+}
+
+function statusBadgeHtml(status) {
+    const cls = OVERTIME_STATUSES[status] ? `status-${status}` : '';
+    return `<span class="status-badge ${cls}">${escapeHtml(statusLabel(status))}</span>`;
+}
+
+function isRecognized(record) {
+    return OVERTIME_STATUSES[record.status]?.countsHours === true;
+}
+
+function recordAmount(record) {
+    return OVERTIME_STATUSES[record.status]?.hasAmount === false ? 0 : record.amount;
+}
+
+function formatRecordAmount(record) {
+    return OVERTIME_STATUSES[record.status]?.hasAmount === false ? '—' : `€${record.amount.toFixed(2)}`;
+}
 
 // Recalcula overtime/overtimeAmount/lastOvertime de un empleado a partir de sus registros reales.
 // Única fuente de verdad para estos totales: evita mantener sumas/restas manuales duplicadas en
@@ -293,11 +332,9 @@ const RECOGNIZED_OVERTIME_STATUSES = ['aprobada', 'pagada'];
 function recalculateEmployeeStats(employeeId) {
     const employee = employees.find(e => e.id === employeeId);
     if (!employee) return;
-    const recognized = overtimeRecords.filter(r =>
-        r.employeeId === employeeId && RECOGNIZED_OVERTIME_STATUSES.includes(r.status)
-    );
+    const recognized = overtimeRecords.filter(r => r.employeeId === employeeId && isRecognized(r));
     employee.overtime = recognized.reduce((sum, r) => sum + r.hours, 0);
-    employee.overtimeAmount = recognized.reduce((sum, r) => sum + r.amount, 0);
+    employee.overtimeAmount = recognized.reduce((sum, r) => sum + recordAmount(r), 0);
     employee.lastOvertime = recognized.length > 0
         ? recognized.reduce((latest, r) => (r.date > latest ? r.date : latest), recognized[0].date)
         : null;
@@ -338,16 +375,16 @@ function loadDashboardData() {
     const filteredRecords = getFilteredOvertimeRecords();
 
     // Si el usuario no ha elegido un estado concreto, "Horas Extras" solo cuenta
-    // lo ya reconocido (aprobada/pagada); si ha filtrado por un estado, se respeta ese filtro tal cual
+    // lo ya reconocido (aprobada/pagada/disfrutada); si ha filtrado por un estado, se respeta ese filtro tal cual
     // (filteredRecords ya viene acotado a ese estado desde getFilteredOvertimeRecords).
     const totalOvertime = filteredRecords
-        .filter(record => overtimeFilterStatus || RECOGNIZED_OVERTIME_STATUSES.includes(record.status))
+        .filter(record => overtimeFilterStatus || isRecognized(record))
         .reduce((sum, record) => sum + record.hours, 0);
 
     // "Total a Pagar": sin filtro de estado, solo lo aprobado aún no pagado; con filtro, respeta ese filtro.
     const totalPay = filteredRecords
         .filter(record => overtimeFilterStatus || record.status === 'aprobada')
-        .reduce((sum, record) => sum + record.amount, 0);
+        .reduce((sum, record) => sum + recordAmount(record), 0);
 
     // "Pendientes de Aprobación" es intencionalmente global (no usa los filtros de la tabla):
     // son acciones que requieren atención, no un total del periodo/vista actual.
@@ -407,24 +444,15 @@ function loadOvertimeTable() {
         const dateObj = new Date(record.date);
         const formattedDate = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-        let statusClass = '';
-        let statusText = '';
-        switch(record.status) {
-            case 'pendiente': statusClass = 'status-pendiente'; statusText = 'Pendiente'; break;
-            case 'aprobada':  statusClass = 'status-aprobada';  statusText = 'Aprobada';  break;
-            case 'pagada':    statusClass = 'status-pagada';    statusText = 'Pagada';    break;
-            case 'rechazada': statusClass = 'status-rechazada'; statusText = 'Rechazada'; break;
-        }
-
         row.innerHTML = `
             <td><input type="checkbox" class="overtime-checkbox" data-id="${record.id}"></td>
-            <td>${record.employeeName}</td>
+            <td>${escapeHtml(record.employeeName)}</td>
             <td>${formattedDate}</td>
             <td>${record.hours}</td>
             <td>€${record.rate.toFixed(2)}</td>
-            <td>€${record.amount.toFixed(2)}</td>
-            <td>${record.reason}</td>
-            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+            <td>${formatRecordAmount(record)}</td>
+            <td>${escapeHtml(record.reason)}</td>
+            <td>${statusBadgeHtml(record.status)}</td>
             <td>
                 <button class="btn btn-secondary btn-sm" onclick="editOvertime(${record.id})"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-secondary btn-sm" onclick="deleteOvertime(${record.id})"><i class="fas fa-trash"></i></button>
@@ -639,8 +667,8 @@ function loadEmployeesTable() {
         }
         
         row.innerHTML = `
-            <td>${employee.name}</td>
-            <td>${employee.department}</td>
+            <td>${escapeHtml(employee.name)}</td>
+            <td>${escapeHtml(employee.department)}</td>
             <td>${employee.overtime}</td>
             <td>€${employee.overtimeAmount.toFixed(2)}</td>
             <td>${lastOvertimeFormatted}</td>
@@ -743,10 +771,10 @@ function createKanbanCard(task) {
     }
     
     card.innerHTML = `
-        <h4>${task.title}</h4>
-        <p>${task.description}</p>
+        <h4>${escapeHtml(task.title)}</h4>
+        <p>${escapeHtml(task.description)}</p>
         <div class="kanban-card-footer">
-            <span>${task.assignee || 'Sin asignar'}</span>
+            <span>${escapeHtml(task.assignee || 'Sin asignar')}</span>
             <span class="kanban-priority ${priorityClass}">${priorityText}</span>
         </div>
     `;
@@ -1174,7 +1202,7 @@ function deleteOvertime(id) {
     const record = overtimeRecords.find(r => r.id === id);
     if (!record) return;
     const dateStr = new Date(record.date + 'T12:00:00').toLocaleDateString('es-ES');
-    const counts = RECOGNIZED_OVERTIME_STATUSES.includes(record.status);
+    const counts = isRecognized(record);
 
     showConfirmModal({
         title: 'Eliminar registro',
@@ -1334,16 +1362,15 @@ function viewEmployee(id) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light);font-style:italic">Sin registros</td></tr>`;
     } else {
         records.forEach(r => {
-            const statusLabels = { pendiente: 'Pendiente', aprobada: 'Aprobada', pagada: 'Pagada', rechazada: 'Rechazada' };
-            const statusClasses = { pendiente: 'status-pendiente', aprobada: 'status-aprobada', pagada: 'status-pagada', rechazada: 'status-rechazada' };
             const date = new Date(r.date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const reason = escapeHtml(r.reason);
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${date}</td>
                 <td>${r.hours} h</td>
-                <td>€${r.amount.toFixed(2)}</td>
-                <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.reason}">${r.reason}</td>
-                <td><span class="status-badge ${statusClasses[r.status] || ''}">${statusLabels[r.status] || r.status}</span></td>
+                <td>${formatRecordAmount(r)}</td>
+                <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${reason}">${reason}</td>
+                <td>${statusBadgeHtml(r.status)}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -1513,13 +1540,17 @@ function exportToPDF() {
         .filter(record => record.status === 'aprobada')
         .reduce((sum, record) => sum + record.amount, 0);
     const totalPendientes = overtimeRecords.filter(record => record.status === 'pendiente').length;
-    
+    const horasDisfrutadas = overtimeRecords
+        .filter(record => record.status === 'disfrutada')
+        .reduce((sum, record) => sum + record.hours, 0);
+
     doc.setFont("helvetica", "bold");
     doc.text("Resumen General", 14, 45);
     doc.setFont("helvetica", "normal");
     doc.text(`Total registros: ${overtimeRecords.length}`, 14, 52);
     doc.text(`Importe total aprobado: €${totalAprobadas.toFixed(2)}`, 14, 58);
     doc.text(`Registros pendientes: ${totalPendientes}`, 14, 64);
+    doc.text(`Horas disfrutadas: ${horasDisfrutadas.toFixed(1)}`, 110, 52);
     doc.text(`Total empleados: ${employees.length}`, 14, 70);
     
     // Preparar datos para la tabla
@@ -1591,14 +1622,6 @@ function prepareOvertimeDataForPDF() {
         const employee = employees.find(emp => emp.id === record.employeeId);
         const department = employee ? employee.department : 'N/A';
         
-        let statusText = '';
-        switch(record.status) {
-            case 'pendiente': statusText = 'Pendiente'; break;
-            case 'aprobada':  statusText = 'Aprobada';  break;
-            case 'pagada':    statusText = 'Pagada';    break;
-            case 'rechazada': statusText = 'Rechazada'; break;
-        }
-
         // Acortar motivo si es muy largo
         let motivo = record.reason;
         if (motivo.length > 50) {
@@ -1611,9 +1634,9 @@ function prepareOvertimeDataForPDF() {
             formattedDate,
             record.hours.toString(),
             '€' + record.rate.toFixed(2),
-            '€' + record.amount.toFixed(2),
+            formatRecordAmount(record),
             motivo,
-            statusText
+            statusLabel(record.status)
         ];
     });
 }
@@ -1659,6 +1682,9 @@ function exportToExcelXLSX() {
             "Horas Aprobadas": overtimeRecords
                 .filter(r => r.status === 'aprobada')
                 .reduce((sum, r) => sum + r.hours, 0).toFixed(2),
+            "Horas Disfrutadas": overtimeRecords
+                .filter(r => r.status === 'disfrutada')
+                .reduce((sum, r) => sum + r.hours, 0).toFixed(2),
             "Importe Total Aprobado": '€' + totalApprovedAmount.toFixed(2),
             "Total Empleados": employees.length
         }];
@@ -1692,23 +1718,15 @@ function prepareOvertimeDataForExcel() {
         const employee = employees.find(emp => emp.id === record.employeeId);
         const department = employee ? employee.department : 'N/A';
         
-        let statusText = '';
-        switch(record.status) {
-            case 'pendiente': statusText = 'Pendiente'; break;
-            case 'aprobada':  statusText = 'Aprobada';  break;
-            case 'pagada':    statusText = 'Pagada';    break;
-            case 'rechazada': statusText = 'Rechazada'; break;
-        }
-
         return {
             "Empleado": record.employeeName,
             "Departamento": department,
             "Fecha": formattedDate,
             "Horas": record.hours,
             "Importe por Hora": record.rate,
-            "Importe Total": record.amount,
+            "Importe Total": recordAmount(record),
             "Motivo": record.reason,
-            "Estado": statusText
+            "Estado": statusLabel(record.status)
         };
     });
 }
@@ -1720,12 +1738,12 @@ function prepareDepartmentDataForExcel() {
     
     overtimeRecords.forEach(record => {
         const employee = employees.find(emp => emp.id === record.employeeId);
-        if (employee && RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
+        if (employee && isRecognized(record)) {
             if (!departmentSummary[employee.department]) {
                 departmentSummary[employee.department] = { hours: 0, amount: 0 };
             }
             departmentSummary[employee.department].hours += record.hours;
-            departmentSummary[employee.department].amount += record.amount;
+            departmentSummary[employee.department].amount += recordAmount(record);
         }
     });
     
@@ -1744,12 +1762,12 @@ function prepareEmployeeDataForExcel() {
     const employeeSummary = {};
     
     overtimeRecords.forEach(record => {
-        if (RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
+        if (isRecognized(record)) {
             if (!employeeSummary[record.employeeName]) {
                 employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
             }
             employeeSummary[record.employeeName].hours += record.hours;
-            employeeSummary[record.employeeName].amount += record.amount;
+            employeeSummary[record.employeeName].amount += recordAmount(record);
         }
     });
 
@@ -1807,7 +1825,7 @@ function createDepartmentChart() {
     getFilteredOvertimeRecords().forEach(record => {
         const employee = employees.find(emp => emp.id === record.employeeId);
         if (!employee) return;
-        if (overtimeFilterStatus || RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
+        if (overtimeFilterStatus || isRecognized(record)) {
             if (!(employee.department in departmentHours)) departmentHours[employee.department] = 0;
             departmentHours[employee.department] += record.hours;
         }
@@ -1887,7 +1905,7 @@ function createDepartmentChart() {
     });
 }
 
-// Horas e importe reales (horas reconocidas: aprobada/pagada) de los últimos N meses, incluido el actual
+// Horas e importe reales (horas reconocidas: aprobada/pagada/disfrutada) de los últimos N meses, incluido el actual
 function getMonthlyOvertimeSummary(numMonths) {
     const now = new Date();
     const buckets = [];
@@ -1900,11 +1918,11 @@ function getMonthlyOvertimeSummary(numMonths) {
     }
     const byKey = Object.fromEntries(buckets.map(b => [b.key, b]));
     overtimeRecords.forEach(record => {
-        if (!RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) return;
+        if (!isRecognized(record)) return;
         const bucket = byKey[record.date.slice(0, 7)];
         if (bucket) {
             bucket.hours += record.hours;
-            bucket.amount += record.amount;
+            bucket.amount += recordAmount(record);
         }
     });
     return buckets;
@@ -2054,12 +2072,12 @@ function createTopEmployeesChart() {
     const employeeSummary = {};
     
     overtimeRecords.forEach(record => {
-        if (RECOGNIZED_OVERTIME_STATUSES.includes(record.status)) {
+        if (isRecognized(record)) {
             if (!employeeSummary[record.employeeName]) {
                 employeeSummary[record.employeeName] = { hours: 0, amount: 0 };
             }
             employeeSummary[record.employeeName].hours += record.hours;
-            employeeSummary[record.employeeName].amount += record.amount;
+            employeeSummary[record.employeeName].amount += recordAmount(record);
         }
     });
 
@@ -2148,7 +2166,7 @@ function showNotification(message, type = 'info') {
     notification.className = `notification notification-${type}`;
     notification.innerHTML = `
         <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-        <span>${message}</span>
+        <span>${escapeHtml(message)}</span>
         <button class="notification-close">&times;</button>
     `;
     

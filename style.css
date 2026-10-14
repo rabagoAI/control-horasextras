@@ -439,6 +439,15 @@ body {
     color: #7ee8f5;
 }
 
+.status-disfrutada {
+    background-color: rgba(111, 66, 193, 0.2);
+    color: #4a2080;
+}
+
+.dark-mode .status-disfrutada {
+    color: #c9a8f5;
+}
+
 /* Modal ancho para ficha de empleado */
 .modal-content-wide {
     max-width: 780px;
