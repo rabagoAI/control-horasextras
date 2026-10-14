@@ -48,6 +48,10 @@ function initializeApp() {
 
     // Configurar selector de periodo de los gráficos de Reportes
     setupReportPeriodFilter();
+
+    document.getElementById('backup-reminder-download').addEventListener('click', exportBackup);
+    document.getElementById('backup-reminder-snooze').addEventListener('click', snoozeBackupReminder);
+    updateBackupReminder();
 }
 
 // Inicializar tema (claro/oscuro)

@@ -52,6 +52,21 @@
         </header>
 
         <main class="main-content">
+            <div class="backup-reminder" id="backup-reminder" role="status" hidden>
+                <i class="fas fa-exclamation-triangle backup-reminder-icon"></i>
+                <div class="backup-reminder-body">
+                    <strong>Tus datos solo se guardan en este navegador.</strong>
+                    <span id="backup-reminder-text"></span>
+                    <span>Si se borra la caché o cambias de equipo, se perderán.</span>
+                </div>
+                <div class="backup-reminder-actions">
+                    <button type="button" class="btn btn-primary btn-sm" id="backup-reminder-download">
+                        <i class="fas fa-download"></i> Descargar copia
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="backup-reminder-snooze">Recordar mañana</button>
+                </div>
+            </div>
+
             <!-- Dashboard principal -->
             <section id="dashboard" class="content-section active">
                 <div class="section-header">
@@ -368,6 +383,7 @@
                         </div>
                         <div class="export-info">
                             <p><i class="fas fa-info-circle"></i> El backup guarda todos los datos (empleados, horas extras y tareas Kanban) en un archivo JSON. Úsalo para hacer copias de seguridad o mover los datos a otro navegador.</p>
+                            <p><i class="fas fa-clock"></i> <span id="last-backup-info"></span></p>
                         </div>
                     </div>
                 </div>

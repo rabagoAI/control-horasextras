@@ -54,6 +54,57 @@ function saveData() {
     localStorage.setItem('overtimeEmployees', JSON.stringify(employees));
     localStorage.setItem('overtimeRecords', JSON.stringify(overtimeRecords));
     localStorage.setItem('kanbanTasks', JSON.stringify(kanbanTasks));
+    localStorage.setItem('dataChangedAt', new Date().toISOString());
+    updateBackupReminder();
+}
+
+// ── Recordatorio de copia de seguridad ──────────────────────────────────────
+const BACKUP_REMINDER_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function readTimestamp(key) {
+    const value = Date.parse(localStorage.getItem(key));
+    return isNaN(value) ? null : value;
+}
+
+function markBackupDone() {
+    localStorage.setItem('lastBackupAt', new Date().toISOString());
+    localStorage.removeItem('backupReminderSnoozedUntil');
+    updateBackupReminder();
+}
+
+function snoozeBackupReminder() {
+    localStorage.setItem('backupReminderSnoozedUntil', new Date(Date.now() + DAY_MS).toISOString());
+    updateBackupReminder();
+}
+
+function updateBackupReminder() {
+    const lastBackup = readTimestamp('lastBackupAt');
+    // Datos de antes de existir esta marca: se tratan como no respaldados
+    const changedAt = readTimestamp('dataChangedAt') ?? Date.now();
+    const snoozedUntil = readTimestamp('backupReminderSnoozedUntil');
+    const hasData = employees.length > 0 || overtimeRecords.length > 0 || kanbanTasks.length > 0;
+    const daysSinceBackup = lastBackup ? Math.floor((Date.now() - lastBackup) / DAY_MS) : null;
+
+    const show = hasData
+        && (lastBackup === null || changedAt > lastBackup)
+        && (daysSinceBackup === null || daysSinceBackup >= BACKUP_REMINDER_DAYS)
+        && !(snoozedUntil && snoozedUntil > Date.now());
+
+    const lastBackupText = lastBackup
+        ? new Date(lastBackup).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : 'nunca';
+
+    const banner = document.getElementById('backup-reminder');
+    if (banner) {
+        banner.hidden = !show;
+        document.getElementById('backup-reminder-text').textContent = lastBackup
+            ? `Tu última copia de seguridad es de hace ${daysSinceBackup} días y hay cambios sin respaldar.`
+            : 'Todavía no has hecho ninguna copia de seguridad.';
+    }
+
+    const info = document.getElementById('last-backup-info');
+    if (info) info.textContent = `Última copia descargada: ${lastBackupText}`;
 }
 
 // Exportar todos los datos como JSON
@@ -76,6 +127,7 @@ function exportBackup() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
+    markBackupDone();
     showNotification('Backup exportado correctamente', 'success');
 }
 
@@ -96,6 +148,8 @@ function doImportBackup(backup) {
     employeesCurrentPage = 1;
 
     saveData();
+    // Los datos coinciden con el archivo importado, que ya es una copia
+    markBackupDone();
     loadDashboardData();
     loadEmployeesTable();
     loadEmployeeSelect();
