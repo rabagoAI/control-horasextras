@@ -200,6 +200,7 @@
                                         <th>Nombre</th>
                                         <th>Departamento</th>
                                         <th>Horas Extras Acumuladas</th>
+                                        <th title="Horas aprobadas pendientes de pagar o disfrutar">Saldo Bolsa</th>
                                         <th>Importe Total</th>
                                         <th>Último Registro</th>
                                         <th>Acciones</th>
@@ -595,6 +596,32 @@
                                 <span class="view-stat-label">Pendiente de pago</span>
                                 <span class="view-stat-value" id="view-employee-pending"></span>
                             </div>
+                        </div>
+                    </div>
+                    <div class="employee-view-bank">
+                        <h4><i class="fas fa-piggy-bank"></i> Bolsa de horas</h4>
+                        <div class="bank-stats">
+                            <div class="bank-stat">
+                                <span class="view-stat-label">Generadas</span>
+                                <span class="view-stat-value" id="bank-generated"></span>
+                            </div>
+                            <div class="bank-stat bank-stat-paid">
+                                <span class="view-stat-label">Pagadas</span>
+                                <span class="view-stat-value" id="bank-paid"></span>
+                            </div>
+                            <div class="bank-stat bank-stat-enjoyed">
+                                <span class="view-stat-label">Disfrutadas</span>
+                                <span class="view-stat-value" id="bank-enjoyed"></span>
+                            </div>
+                            <div class="bank-stat bank-stat-balance">
+                                <span class="view-stat-label">Saldo pendiente</span>
+                                <span class="view-stat-value" id="bank-balance"></span>
+                            </div>
+                        </div>
+                        <div class="bank-bar" id="bank-bar" role="img">
+                            <span class="bank-bar-paid" id="bank-bar-paid"></span>
+                            <span class="bank-bar-enjoyed" id="bank-bar-enjoyed"></span>
+                            <span class="bank-bar-balance" id="bank-bar-balance"></span>
                         </div>
                     </div>
                     <div class="employee-view-records">

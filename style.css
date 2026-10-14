@@ -503,6 +503,7 @@ body {
 }
 
 .employee-view-info h4,
+.employee-view-bank h4,
 .employee-view-records h4 {
     font-size: 0.9rem;
     font-weight: 600;
@@ -572,6 +573,66 @@ body {
 .employee-view-records {
     border-top: 1px solid var(--border-color);
     padding-top: var(--spacing-lg);
+}
+
+/* Bolsa de horas: colores alineados con los estados aprobada/pagada/disfrutada */
+.employee-view-bank {
+    --bank-paid: rgb(23, 162, 184);
+    --bank-enjoyed: rgb(111, 66, 193);
+    --bank-balance: rgb(40, 167, 69);
+    border-top: 1px solid var(--border-color);
+    padding-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.bank-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.bank-stat {
+    background-color: var(--bg-color);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-left: 3px solid var(--primary-color);
+}
+
+.bank-stat-paid    { border-left-color: var(--bank-paid); }
+.bank-stat-enjoyed { border-left-color: var(--bank-enjoyed); }
+.bank-stat-balance { border-left-color: var(--bank-balance); }
+
+.bank-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: var(--bg-color);
+}
+
+.bank-bar span {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.bank-bar-paid    { background-color: var(--bank-paid); }
+.bank-bar-enjoyed { background-color: var(--bank-enjoyed); }
+.bank-bar-balance { background-color: var(--bank-balance); }
+
+.bank-balance-pending {
+    font-weight: 700;
+    color: #155724;
+}
+
+.dark-mode .bank-balance-pending {
+    color: #7ee2a0;
+}
+
+@media (max-width: 600px) {
+    .bank-stats {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 /* Panel Kanban */

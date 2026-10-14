@@ -1,3 +1,20 @@
+// Saldo = horas aprobadas aún sin compensar (ni pagadas ni disfrutadas)
+function getHoursBank(employeeId) {
+    const bank = { generated: 0, paid: 0, enjoyed: 0, balance: 0 };
+    overtimeRecords.forEach(r => {
+        if (r.employeeId !== employeeId || !isRecognized(r)) return;
+        bank.generated += r.hours;
+        if (r.status === 'pagada') bank.paid += r.hours;
+        else if (r.status === 'disfrutada') bank.enjoyed += r.hours;
+        else if (r.status === 'aprobada') bank.balance += r.hours;
+    });
+    return bank;
+}
+
+function formatHours(hours) {
+    return `${hours.toLocaleString('es-ES', { maximumFractionDigits: 1 })} h`;
+}
+
 // Cargar tabla de empleados
 function loadEmployeesTable() {
     const tableBody = document.getElementById('employees-table');
@@ -15,9 +32,9 @@ function loadEmployeesTable() {
     if (filtered.length === 0) {
         const row = document.createElement('tr');
         if (employees.length === 0) {
-            row.innerHTML = `<td colspan="6">${emptyStateHtml('users', 'Aún no hay empleados', 'Agrega el primer empleado para empezar a registrar horas extras.', 'Agregar empleado', "document.getElementById('add-employee-btn').click()")}</td>`;
+            row.innerHTML = `<td colspan="7">${emptyStateHtml('users', 'Aún no hay empleados', 'Agrega el primer empleado para empezar a registrar horas extras.', 'Agregar empleado', "document.getElementById('add-employee-btn').click()")}</td>`;
         } else {
-            row.innerHTML = `<td colspan="6">${emptyStateHtml('search', 'Sin resultados', 'No hay empleados que coincidan con la búsqueda.')}</td>`;
+            row.innerHTML = `<td colspan="7">${emptyStateHtml('search', 'Sin resultados', 'No hay empleados que coincidan con la búsqueda.')}</td>`;
         }
         tableBody.appendChild(row);
         document.getElementById('employees-pagination').innerHTML = '';
@@ -45,10 +62,13 @@ function loadEmployeesTable() {
             });
         }
         
+        const balance = getHoursBank(employee.id).balance;
+
         row.innerHTML = `
             <td>${escapeHtml(employee.name)}</td>
             <td>${escapeHtml(employee.department)}</td>
             <td>${employee.overtime}</td>
+            <td><span class="bank-balance ${balance > 0 ? 'bank-balance-pending' : ''}">${formatHours(balance)}</span></td>
             <td>€${employee.overtimeAmount.toFixed(2)}</td>
             <td>${lastOvertimeFormatted}</td>
             <td>
@@ -208,6 +228,18 @@ function viewEmployee(id) {
         .filter(r => r.employeeId === id && r.status === 'aprobada')
         .reduce((sum, r) => sum + r.amount, 0);
     document.getElementById('view-employee-pending').textContent = `€${pending.toFixed(2)}`;
+
+    const bank = getHoursBank(id);
+    document.getElementById('bank-generated').textContent = formatHours(bank.generated);
+    document.getElementById('bank-paid').textContent = formatHours(bank.paid);
+    document.getElementById('bank-enjoyed').textContent = formatHours(bank.enjoyed);
+    document.getElementById('bank-balance').textContent = formatHours(bank.balance);
+    const pct = h => bank.generated > 0 ? `${(h / bank.generated) * 100}%` : '0%';
+    document.getElementById('bank-bar-paid').style.width = pct(bank.paid);
+    document.getElementById('bank-bar-enjoyed').style.width = pct(bank.enjoyed);
+    document.getElementById('bank-bar-balance').style.width = pct(bank.balance);
+    document.getElementById('bank-bar').setAttribute('aria-label',
+        `Pagadas ${formatHours(bank.paid)}, disfrutadas ${formatHours(bank.enjoyed)}, pendientes ${formatHours(bank.balance)}`);
 
     // Últimos 6 registros del empleado
     const tbody = document.getElementById('view-employee-records-body');
