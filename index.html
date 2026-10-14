@@ -242,62 +242,23 @@
             <section id="kanban" class="content-section">
                 <div class="section-header">
                     <h2><i class="fas fa-columns"></i> Panel Kanban</h2>
-                    <p>Organiza las solicitudes de horas extras por estado</p>
+                    <p>Arrastra una tarjeta a otra columna para cambiar su estado; haz clic en ella para editar el registro.</p>
                 </div>
                 
-                <div class="kanban-container">
-                    <div class="kanban-column">
-                        <div class="kanban-header">
-                            <h3><i class="fas fa-clipboard-list"></i> Pendientes</h3>
-                            <span class="kanban-count" id="pending-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="pending-column">
-                            <!-- Tarjetas se añaden dinámicamente -->
-                        </div>
-                        <button class="kanban-add-btn" data-status="pendiente">
-                            <i class="fas fa-plus"></i> Agregar Tarea
-                        </button>
-                    </div>
-                    
-                    <div class="kanban-column">
-                        <div class="kanban-header">
-                            <h3><i class="fas fa-spinner"></i> En Proceso</h3>
-                            <span class="kanban-count" id="inprogress-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="inprogress-column">
-                            <!-- Tarjetas se añaden dinámicamente -->
-                        </div>
-                        <button class="kanban-add-btn" data-status="en-proceso">
-                            <i class="fas fa-plus"></i> Agregar Tarea
-                        </button>
-                    </div>
-                    
-                    <div class="kanban-column">
-                        <div class="kanban-header">
-                            <h3><i class="fas fa-check-circle"></i> Aprobadas</h3>
-                            <span class="kanban-count" id="approved-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="approved-column">
-                            <!-- Tarjetas se añaden dinámicamente -->
-                        </div>
-                        <button class="kanban-add-btn" data-status="aprobada">
-                            <i class="fas fa-plus"></i> Agregar Tarea
-                        </button>
-                    </div>
-                    
-                    <div class="kanban-column">
-                        <div class="kanban-header">
-                            <h3><i class="fas fa-times-circle"></i> Rechazadas</h3>
-                            <span class="kanban-count" id="rejected-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="rejected-column">
-                            <!-- Tarjetas se añaden dinámicamente -->
-                        </div>
-                        <button class="kanban-add-btn" data-status="rechazada">
-                            <i class="fas fa-plus"></i> Agregar Tarea
-                        </button>
-                    </div>
+                <div class="kanban-toolbar">
+                    <select id="kanban-employee-filter" aria-label="Filtrar por empleado">
+                        <option value="">Todos los empleados</option>
+                    </select>
+                    <select id="kanban-period-filter" aria-label="Periodo">
+                        <option value="3">Últimos 3 meses</option>
+                        <option value="6">Últimos 6 meses</option>
+                        <option value="12">Último año</option>
+                        <option value="0">Todo</option>
+                    </select>
+                    <span class="kanban-toolbar-note"><i class="fas fa-info-circle"></i> Las pendientes se muestran siempre, sea cual sea el periodo.</span>
                 </div>
+
+                <div class="kanban-container" id="kanban-board"></div>
             </section>
 
             <!-- Sección de reportes -->
@@ -373,6 +334,21 @@
 
                 <div class="card full-width">
                     <div class="card-header">
+                        <h3><i class="fas fa-percent"></i> Recargos por Tipo de Hora</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="hour-types-form" class="hour-types-form" novalidate>
+                            <div class="hour-types-fields" id="hour-types-fields"></div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar recargos</button>
+                        </form>
+                        <div class="export-info">
+                            <p><i class="fas fa-info-circle"></i> Importe = horas × importe por hora × recargo. Los cambios se aplican a los registros nuevos y a los que cambien de tipo; los ya guardados conservan el recargo con el que se registraron.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card full-width">
+                    <div class="card-header">
                         <h3><i class="fas fa-database"></i> Copia de Seguridad</h3>
                     </div>
                     <div class="card-body">
@@ -423,7 +399,12 @@
                                 <label for="overtime-rate">Importe por Hora (€)</label>
                                 <input type="number" id="overtime-rate" min="0" step="0.01" placeholder="50.00" required>
                             </div>
+                            <div class="form-group">
+                                <label for="overtime-hour-type">Tipo de hora</label>
+                                <select id="overtime-hour-type"></select>
+                            </div>
                         </div>
+                        <p class="amount-preview" id="overtime-amount-preview" aria-live="polite"></p>
                         
                         <div class="form-group">
                             <label for="overtime-reason">Motivo</label>
@@ -507,62 +488,6 @@
                         <div class="form-actions">
                             <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Agregar Empleado</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Modal para detalles de tarjeta Kanban -->
-        <div id="kanban-modal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 id="kanban-modal-title"><i class="fas fa-tasks"></i> Detalles de la Tarea</h3>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <form id="kanban-form">
-                        <div class="form-group">
-                            <label for="kanban-title">Título</label>
-                            <input type="text" id="kanban-title" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="kanban-description">Descripción</label>
-                            <textarea id="kanban-description" rows="3" required></textarea>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="kanban-assignee">Asignado a</label>
-                                <select id="kanban-assignee">
-                                    <option value="">Sin asignar</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="kanban-priority">Prioridad</label>
-                                <select id="kanban-priority">
-                                    <option value="baja">Baja</option>
-                                    <option value="media">Media</option>
-                                    <option value="alta">Alta</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="kanban-status">Estado</label>
-                            <select id="kanban-status">
-                                <option value="pendiente">Pendiente</option>
-                                <option value="en-proceso">En Proceso</option>
-                                <option value="aprobada">Aprobada</option>
-                                <option value="rechazada">Rechazada</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button type="button" class="btn btn-danger" id="delete-kanban-btn">Eliminar</button>
-                            <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
-                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
                         </div>
                     </form>
                 </div>

@@ -278,7 +278,7 @@ function viewEmployee(id) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${date}</td>
-                <td>${r.hours} h</td>
+                <td>${r.hours} h${hourTypeTagHtml(r)}</td>
                 <td>${formatRecordAmount(r)}</td>
                 <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${reason}">${reason}</td>
                 <td>${statusBadgeHtml(r.status)}</td>

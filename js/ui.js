@@ -166,6 +166,11 @@ function setupModals() {
             const emp = employees.find(e => e.id === parseInt(this.value));
             if (emp) document.getElementById('overtime-rate').value = emp.hourlyRate;
         }
+        updateOvertimeAmountPreview();
+    });
+    ['overtime-hours', 'overtime-rate', 'overtime-hour-type'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateOvertimeAmountPreview);
+        document.getElementById(id).addEventListener('change', updateOvertimeAmountPreview);
     });
 }
 

@@ -30,7 +30,8 @@ function loadSavedData() {
         }
     }
     
-    // Intentar cargar tareas Kanban
+    // Tareas del antiguo Kanban: ya no se muestran, pero se cargan para que saveData no las borre
+    // y sigan incluidas en las copias de seguridad
     const savedKanban = localStorage.getItem('kanbanTasks');
     if (savedKanban) {
         try {
@@ -45,8 +46,31 @@ function loadSavedData() {
         }
     }
 
+    try {
+        hourTypeMultipliers = sanitizeMultipliers(JSON.parse(localStorage.getItem('hourTypeMultipliers')));
+    } catch (e) {
+        hourTypeMultipliers = {};
+    }
+
     // Los totales guardados pueden venir de reglas de estado anteriores
     employees.forEach(emp => recalculateEmployeeStats(emp.id));
+}
+
+const MIN_MULTIPLIER = 1;
+const MAX_MULTIPLIER = 5;
+
+function sanitizeMultipliers(value) {
+    const result = {};
+    if (!value || typeof value !== 'object') return result;
+    Object.keys(HOUR_TYPES).forEach(type => {
+        const m = value[type];
+        if (typeof m === 'number' && m >= MIN_MULTIPLIER && m <= MAX_MULTIPLIER) result[type] = m;
+    });
+    return result;
+}
+
+function saveHourTypeMultipliers() {
+    localStorage.setItem('hourTypeMultipliers', JSON.stringify(hourTypeMultipliers));
 }
 
 // Guardar datos en localStorage
@@ -114,7 +138,8 @@ function exportBackup() {
         exportDate: new Date().toISOString(),
         employees: employees,
         overtimeRecords: overtimeRecords,
-        kanbanTasks: kanbanTasks
+        kanbanTasks: kanbanTasks,
+        hourTypeMultipliers: hourTypeMultipliers
     };
 
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -135,6 +160,12 @@ function doImportBackup(backup) {
     employees = backup.employees;
     overtimeRecords = backup.overtimeRecords;
     kanbanTasks = backup.kanbanTasks || [];
+    // Las copias anteriores a los recargos no los incluyen: se conserva la configuración actual
+    if (backup.hourTypeMultipliers) {
+        hourTypeMultipliers = sanitizeMultipliers(backup.hourTypeMultipliers);
+        saveHourTypeMultipliers();
+        renderHourTypeSettings();
+    }
 
     currentEmployeeId = employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1;
     currentOvertimeId = overtimeRecords.length > 0 ? Math.max(...overtimeRecords.map(r => r.id)) + 1 : 1;

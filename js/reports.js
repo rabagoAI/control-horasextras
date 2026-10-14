@@ -104,10 +104,10 @@ function exportToPDF() {
                 0: { cellWidth: 30 },
                 1: { cellWidth: 25 },
                 2: { cellWidth: 20 },
-                3: { cellWidth: 12 },
+                3: { cellWidth: 18 },
                 4: { cellWidth: 15 },
                 5: { cellWidth: 15 },
-                6: { cellWidth: 40 },
+                6: { cellWidth: 34 },
                 7: { cellWidth: 20 }
             },
             margin: { top: 80 }
@@ -153,7 +153,9 @@ function prepareOvertimeDataForPDF() {
             record.employeeName,
             department,
             formattedDate,
-            record.hours.toString(),
+            recordHourType(record) === 'normal' && recordMultiplier(record) === 1
+                ? record.hours.toString()
+                : `${record.hours} (${HOUR_TYPES[recordHourType(record)].label} ${formatMultiplier(recordMultiplier(record))})`,
             '€' + record.rate.toFixed(2),
             formatRecordAmount(record),
             motivo,
@@ -244,6 +246,8 @@ function prepareOvertimeDataForExcel() {
             "Departamento": department,
             "Fecha": formattedDate,
             "Horas": record.hours,
+            "Tipo de Hora": HOUR_TYPES[recordHourType(record)].label,
+            "Recargo": recordMultiplier(record),
             "Importe por Hora": record.rate,
             "Importe Total": recordAmount(record),
             "Motivo": record.reason,

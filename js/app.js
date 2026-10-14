@@ -7,9 +7,10 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     // Inicializar modo oscuro/claro
     initTheme();
-    
+
     // Cargar datos guardados del localStorage
     loadSavedData();
+    setupHourTypeSettings();
 
     // Por defecto, la tabla (y por tanto las tarjetas) muestran el mes actual
     const { from, to } = getCurrentMonthRange();
@@ -137,17 +138,5 @@ function setupForms() {
     document.getElementById('employee-form').addEventListener('submit', function(e) {
         e.preventDefault();
         saveEmployee();
-    });
-    
-    // Formulario de tarea Kanban
-    document.getElementById('kanban-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        saveKanbanTask();
-    });
-    
-    // Botón eliminar tarea Kanban
-    document.getElementById('delete-kanban-btn').addEventListener('click', function() {
-        const taskId = parseInt(this.dataset.taskId);
-        deleteKanbanTask(taskId);
     });
 }

@@ -120,7 +120,7 @@ function loadOvertimeTable() {
             <td><input type="checkbox" class="overtime-checkbox" data-id="${record.id}"></td>
             <td>${escapeHtml(record.employeeName)}</td>
             <td>${formattedDate}</td>
-            <td>${record.hours}</td>
+            <td>${record.hours}${hourTypeTagHtml(record)}</td>
             <td>€${record.rate.toFixed(2)}</td>
             <td>${formatRecordAmount(record)}</td>
             <td>${escapeHtml(record.reason)}</td>
@@ -218,7 +218,10 @@ function setupOvertimeFilters() {
     bulkStatusSelect.addEventListener('change', function() {
         const newStatus = this.value;
         this.value = '';
-        if (newStatus) changeSelectedStatus(newStatus);
+        if (newStatus) {
+            const ids = new Set(Array.from(document.querySelectorAll('.overtime-checkbox:checked')).map(cb => parseInt(cb.dataset.id)));
+            changeRecordsStatus(ids, newStatus);
+        }
     });
 
     document.getElementById('overtime-date-from').addEventListener('change', function() {
@@ -262,8 +265,8 @@ function deleteSelectedOvertimes() {
     });
 }
 
-function changeSelectedStatus(newStatus) {
-    const ids = new Set(Array.from(document.querySelectorAll('.overtime-checkbox:checked')).map(cb => parseInt(cb.dataset.id)));
+// confirm: false aplica el cambio sin preguntar, salvo que haya aviso del límite anual
+function changeRecordsStatus(ids, newStatus, { confirm = true } = {}) {
     const toChange = overtimeRecords.filter(r => ids.has(r.id) && r.status !== newStatus);
     const label = statusLabel(newStatus);
 
@@ -292,6 +295,25 @@ function changeSelectedStatus(newStatus) {
 
     const count = toChange.length;
     const skipped = ids.size - count;
+    const apply = () => {
+        const at = new Date().toISOString();
+        toChange.forEach(r => {
+            r.history = [...(Array.isArray(r.history) ? r.history : []), { at, from: r.status, to: newStatus }];
+            r.status = newStatus;
+        });
+        new Set(toChange.map(r => r.employeeId)).forEach(recalculateEmployeeStats);
+        saveData();
+        showNotification(`${count} registro${count !== 1 ? 's' : ''} cambiado${count !== 1 ? 's' : ''} a "${label}"`, 'success');
+        loadDashboardData();
+        loadEmployeesTable();
+        loadKanbanBoard();
+    };
+
+    if (!confirm && limitWarnings.length === 0) {
+        apply();
+        return;
+    }
+
     showConfirmModal({
         title: `Cambiar estado a "${label}"`,
         message: `Se cambiará el estado de ${count} registro${count !== 1 ? 's' : ''}` +
@@ -301,18 +323,7 @@ function changeSelectedStatus(newStatus) {
             : '',
         confirmText: 'Cambiar estado',
         danger: false,
-        onConfirm: () => {
-            const at = new Date().toISOString();
-            toChange.forEach(r => {
-                r.history = [...(Array.isArray(r.history) ? r.history : []), { at, from: r.status, to: newStatus }];
-                r.status = newStatus;
-            });
-            new Set(toChange.map(r => r.employeeId)).forEach(recalculateEmployeeStats);
-            saveData();
-            showNotification(`${count} registro${count !== 1 ? 's' : ''} cambiado${count !== 1 ? 's' : ''} a "${label}"`, 'success');
-            loadDashboardData();
-            loadEmployeesTable();
-        }
+        onConfirm: apply
     });
 }
 
@@ -329,6 +340,79 @@ function loadEmployeeSelect() {
     });
 
     populateOvertimeEmployeeFilter();
+}
+
+// Al editar sin cambiar el tipo se conserva el recargo con el que se guardó, aunque la configuración haya cambiado
+function multiplierForForm(hourType) {
+    const id = document.getElementById('overtime-form').dataset.id;
+    const previous = id ? overtimeRecords.find(r => r.id === parseInt(id)) : null;
+    return previous && recordHourType(previous) === hourType
+        ? recordMultiplier(previous)
+        : getHourTypeMultiplier(hourType);
+}
+
+function updateOvertimeAmountPreview() {
+    const preview = document.getElementById('overtime-amount-preview');
+    const hours = parseFloat(document.getElementById('overtime-hours').value);
+    const rate = parseFloat(document.getElementById('overtime-rate').value);
+    const hourType = document.getElementById('overtime-hour-type').value;
+    if (!(hours > 0) || !(rate > 0) || !HOUR_TYPES[hourType]) {
+        preview.textContent = '';
+        return;
+    }
+    const multiplier = multiplierForForm(hourType);
+    const amount = hours * rate * multiplier;
+    preview.textContent = `Importe: ${formatHours(hours)} × €${rate.toFixed(2)} × ${formatMultiplier(multiplier).slice(1)} = €${amount.toFixed(2)}`;
+}
+
+function populateHourTypeSelect() {
+    const select = document.getElementById('overtime-hour-type');
+    const current = select.value;
+    select.innerHTML = '';
+    Object.entries(HOUR_TYPES).forEach(([type, { label }]) => {
+        select.add(new Option(`${label} (${formatMultiplier(getHourTypeMultiplier(type))})`, type));
+    });
+    select.value = current || 'normal';
+}
+
+// Tarjeta de configuración de recargos (sección Reportes)
+function renderHourTypeSettings() {
+    const container = document.getElementById('hour-types-fields');
+    container.innerHTML = '';
+    Object.entries(HOUR_TYPES).forEach(([type, { label }]) => {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+        group.innerHTML = `
+            <label for="multiplier-${type}">${escapeHtml(label)}</label>
+            <input type="number" id="multiplier-${type}" min="${MIN_MULTIPLIER}" max="${MAX_MULTIPLIER}" step="0.05" required>`;
+        container.appendChild(group);
+        group.querySelector('input').value = getHourTypeMultiplier(type);
+    });
+    populateHourTypeSelect();
+}
+
+function setupHourTypeSettings() {
+    renderHourTypeSettings();
+    document.getElementById('hour-types-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        clearFieldErrors('hour-types-form');
+        const values = {};
+        let valid = true;
+        Object.keys(HOUR_TYPES).forEach(type => {
+            const value = parseFloat(document.getElementById(`multiplier-${type}`).value);
+            if (!(value >= MIN_MULTIPLIER && value <= MAX_MULTIPLIER)) {
+                showFieldError(`multiplier-${type}`, `Entre ${MIN_MULTIPLIER} y ${MAX_MULTIPLIER}`);
+                valid = false;
+            } else {
+                values[type] = Math.round(value * 100) / 100;
+            }
+        });
+        if (!valid) return;
+        hourTypeMultipliers = values;
+        saveHourTypeMultipliers();
+        renderHourTypeSettings();
+        showNotification('Recargos guardados. Se aplicarán a los registros nuevos.', 'success');
+    });
 }
 
 // Abrir modal de horas extras
@@ -349,6 +433,7 @@ function openOvertimeModal(overtime = null) {
         document.getElementById('overtime-rate').value = overtime.rate;
         document.getElementById('overtime-reason').value = overtime.reason;
         document.getElementById('overtime-status').value = overtime.status;
+        document.getElementById('overtime-hour-type').value = recordHourType(overtime);
         renderStatusHistory(overtime);
     } else {
         document.getElementById('overtime-history').hidden = true;
@@ -356,12 +441,13 @@ function openOvertimeModal(overtime = null) {
         modalTitle.innerHTML = '<i class="fas fa-clock"></i> Registrar Horas Extras';
         form.reset();
         delete form.dataset.id;
-        
+
         // Establecer fecha por defecto (hoy)
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('overtime-date').value = today;
-        
+        document.getElementById('overtime-hour-type').value = 'normal';
     }
+    updateOvertimeAmountPreview();
 
     modal.classList.add('active');
 }
@@ -439,8 +525,12 @@ function saveOvertime() {
         if (!confirmed) return;
     }
 
-    const amount = hours * rate;
-    
+    const hourType = HOUR_TYPES[document.getElementById('overtime-hour-type').value]
+        ? document.getElementById('overtime-hour-type').value
+        : 'normal';
+    const multiplier = multiplierForForm(hourType);
+    const amount = hours * rate * multiplier;
+
     const overtimeData = {
         id: form.dataset.id ? parseInt(form.dataset.id) : currentOvertimeId++,
         employeeId: employeeId,
@@ -448,6 +538,8 @@ function saveOvertime() {
         date: document.getElementById('overtime-date').value,
         hours: hours,
         rate: rate,
+        hourType: hourType,
+        multiplier: multiplier,
         amount: amount,
         reason: document.getElementById('overtime-reason').value,
         status: document.getElementById('overtime-status').value
@@ -514,6 +606,7 @@ function commitOvertime(overtimeData, isEdit) {
     document.getElementById('overtime-modal').classList.remove('active');
     loadDashboardData();
     loadEmployeesTable();
+    loadKanbanBoard();
 }
 
 // Editar horas extras

@@ -6,7 +6,7 @@ let kanbanTasks = [];
 let currentOvertimeId = 1;
 let currentEmployeeId = 1;
 let currentKanbanId = 1;
-let draggedTask = null;
+let draggedRecordId = null;
 let overtimeFilterEmployeeId = '';
 let overtimeFilterStatus = '';
 let overtimeFilterDateFrom = '';
@@ -25,6 +25,38 @@ const OVERTIME_STATUSES = {
     disfrutada: { label: 'Disfrutada', countsHours: true,  hasAmount: false, countsTowardLimit: false },
     rechazada:  { label: 'Rechazada',  countsHours: false, hasAmount: true,  countsTowardLimit: false },
 };
+
+const HOUR_TYPES = {
+    normal:   { label: 'Normal',   defaultMultiplier: 1 },
+    nocturna: { label: 'Nocturna', defaultMultiplier: 1.25 },
+    festivo:  { label: 'Festivo',  defaultMultiplier: 1.75 },
+};
+
+// Recargos configurados por el usuario; los que falten usan el valor por defecto
+let hourTypeMultipliers = {};
+
+function getHourTypeMultiplier(type) {
+    return hourTypeMultipliers[type] ?? HOUR_TYPES[type]?.defaultMultiplier ?? 1;
+}
+
+// Registros anteriores a los tipos de hora: normales con recargo ×1
+function recordHourType(record) {
+    return HOUR_TYPES[record.hourType] ? record.hourType : 'normal';
+}
+
+function recordMultiplier(record) {
+    return typeof record.multiplier === 'number' ? record.multiplier : 1;
+}
+
+function formatMultiplier(multiplier) {
+    return `×${multiplier.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function hourTypeTagHtml(record) {
+    const type = recordHourType(record);
+    if (type === 'normal' && recordMultiplier(record) === 1) return '';
+    return `<span class="hour-type-tag hour-type-${type}">${escapeHtml(HOUR_TYPES[type].label)} ${formatMultiplier(recordMultiplier(record))}</span>`;
+}
 
 const ANNUAL_OVERTIME_LIMIT = 80;
 const ANNUAL_OVERTIME_WARNING = 60;
