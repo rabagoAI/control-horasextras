@@ -53,6 +53,39 @@ function initializeApp() {
     document.getElementById('backup-reminder-download').addEventListener('click', exportBackup);
     document.getElementById('backup-reminder-snooze').addEventListener('click', snoozeBackupReminder);
     updateBackupReminder();
+
+    setupPwa();
+}
+
+// Instalación como app y funcionamiento sin conexión (solo cuando se sirve por http/https)
+function setupPwa() {
+    if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+
+    navigator.serviceWorker.register('sw.js').catch(err => {
+        console.warn('No se pudo registrar el service worker:', err);
+    });
+
+    const installBtn = document.getElementById('install-app-btn');
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.hidden = false;
+    });
+
+    installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.hidden = true;
+    });
+
+    window.addEventListener('appinstalled', () => {
+        installBtn.hidden = true;
+        showNotification('App instalada correctamente', 'success');
+    });
 }
 
 // Inicializar tema (claro/oscuro)
