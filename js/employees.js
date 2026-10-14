@@ -63,9 +63,15 @@ function loadEmployeesTable() {
         }
         
         const balance = getHoursBank(employee.id).balance;
+        const yearHours = getAnnualLimitHours(employee.id, new Date().getFullYear());
+        const level = annualLimitLevel(yearHours);
+        const limitBadge = level === 'ok' ? '' : `
+            <span class="limit-badge limit-badge-${level}" title="${level === 'over' ? 'Supera' : 'Cerca de'} el máximo legal de ${ANNUAL_OVERTIME_LIMIT} h/año">
+                <i class="fas fa-exclamation-triangle"></i> ${formatHours(yearHours)}
+            </span>`;
 
         row.innerHTML = `
-            <td>${escapeHtml(employee.name)}</td>
+            <td>${escapeHtml(employee.name)}${limitBadge}</td>
             <td>${escapeHtml(employee.department)}</td>
             <td>${employee.overtime}</td>
             <td><span class="bank-balance ${balance > 0 ? 'bank-balance-pending' : ''}">${formatHours(balance)}</span></td>
@@ -240,6 +246,20 @@ function viewEmployee(id) {
     document.getElementById('bank-bar-balance').style.width = pct(bank.balance);
     document.getElementById('bank-bar').setAttribute('aria-label',
         `Pagadas ${formatHours(bank.paid)}, disfrutadas ${formatHours(bank.enjoyed)}, pendientes ${formatHours(bank.balance)}`);
+
+    const year = new Date().getFullYear();
+    const yearHours = getAnnualLimitHours(id, year);
+    const level = annualLimitLevel(yearHours);
+    const notes = {
+        ok: 'Horas aprobadas y pagadas este año. Las disfrutadas no computan.',
+        near: `Quedan ${formatHours(ANNUAL_OVERTIME_LIMIT - yearHours)} hasta el máximo legal.`,
+        over: `Supera el máximo legal en ${formatHours(yearHours - ANNUAL_OVERTIME_LIMIT)}.`,
+    };
+    document.getElementById('annual-limit').className = `annual-limit annual-limit-${level}`;
+    document.getElementById('annual-limit-year').textContent = year;
+    document.getElementById('annual-limit-value').textContent = `${formatHours(yearHours)} / ${ANNUAL_OVERTIME_LIMIT} h`;
+    document.getElementById('annual-limit-fill').style.width = `${Math.min(yearHours / ANNUAL_OVERTIME_LIMIT, 1) * 100}%`;
+    document.getElementById('annual-limit-note').textContent = notes[level];
 
     // Últimos 6 registros del empleado
     const tbody = document.getElementById('view-employee-records-body');

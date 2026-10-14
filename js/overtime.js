@@ -365,8 +365,35 @@ function saveOvertime() {
         reason: document.getElementById('overtime-reason').value,
         status: document.getElementById('overtime-status').value
     };
-    
-    if (form.dataset.id) {
+
+    // Las pendientes también se avisan: aún no computan, pero lo harán si se aprueban
+    const limitStatus = s => OVERTIME_STATUSES[s]?.countsTowardLimit || s === 'pendiente';
+    const year = overtimeData.date.slice(0, 4);
+    const previous = currentId ? overtimeRecords.find(r => r.id === currentId) : null;
+    const previousHours = previous && previous.employeeId === employeeId && previous.date.startsWith(`${year}-`)
+        && limitStatus(previous.status) ? previous.hours : 0;
+    const projected = getAnnualLimitHours(employeeId, year, currentId) + hours;
+
+    if (limitStatus(overtimeData.status) && hours > previousHours && projected > ANNUAL_OVERTIME_LIMIT) {
+        const isPending = overtimeData.status === 'pendiente';
+        showConfirmModal({
+            title: 'Límite anual de horas extra',
+            message: `${isPending ? 'Si se aprueba este registro' : 'Con este registro'}, ${employee.name} sumará ${formatHours(projected)} extra en ${year}.`,
+            warning: `El máximo legal es de ${ANNUAL_OVERTIME_LIMIT} h al año (art. 35.2 del Estatuto de los Trabajadores). Las horas compensadas con descanso no computan.`,
+            confirmText: 'Guardar igualmente',
+            danger: false,
+            onConfirm: () => commitOvertime(overtimeData, Boolean(currentId))
+        });
+        return;
+    }
+
+    commitOvertime(overtimeData, Boolean(currentId));
+}
+
+function commitOvertime(overtimeData, isEdit) {
+    const employeeId = overtimeData.employeeId;
+
+    if (isEdit) {
         // Actualizar registro existente
         const index = overtimeRecords.findIndex(record => record.id === overtimeData.id);
         if (index !== -1) {

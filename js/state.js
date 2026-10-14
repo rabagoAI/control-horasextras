@@ -17,13 +17,30 @@ let overtimeCurrentPage = 1;
 let employeesCurrentPage = 1;
 
 // countsHours: suma en los totales de horas reconocidas. hasAmount: false = se compensa en tiempo, no en €.
+// countsTowardLimit: computa para el tope legal anual (art. 35.2 ET: las compensadas con descanso no computan).
 const OVERTIME_STATUSES = {
-    pendiente:  { label: 'Pendiente',  countsHours: false, hasAmount: true  },
-    aprobada:   { label: 'Aprobada',   countsHours: true,  hasAmount: true  },
-    pagada:     { label: 'Pagada',     countsHours: true,  hasAmount: true  },
-    disfrutada: { label: 'Disfrutada', countsHours: true,  hasAmount: false },
-    rechazada:  { label: 'Rechazada',  countsHours: false, hasAmount: true  },
+    pendiente:  { label: 'Pendiente',  countsHours: false, hasAmount: true,  countsTowardLimit: false },
+    aprobada:   { label: 'Aprobada',   countsHours: true,  hasAmount: true,  countsTowardLimit: true  },
+    pagada:     { label: 'Pagada',     countsHours: true,  hasAmount: true,  countsTowardLimit: true  },
+    disfrutada: { label: 'Disfrutada', countsHours: true,  hasAmount: false, countsTowardLimit: false },
+    rechazada:  { label: 'Rechazada',  countsHours: false, hasAmount: true,  countsTowardLimit: false },
 };
+
+const ANNUAL_OVERTIME_LIMIT = 80;
+const ANNUAL_OVERTIME_WARNING = 60;
+
+function getAnnualLimitHours(employeeId, year, excludeRecordId = null) {
+    return overtimeRecords
+        .filter(r => r.employeeId === employeeId && r.id !== excludeRecordId && r.date.startsWith(`${year}-`)
+            && OVERTIME_STATUSES[r.status]?.countsTowardLimit)
+        .reduce((sum, r) => sum + r.hours, 0);
+}
+
+function annualLimitLevel(hours) {
+    if (hours > ANNUAL_OVERTIME_LIMIT) return 'over';
+    if (hours >= ANNUAL_OVERTIME_WARNING) return 'near';
+    return 'ok';
+}
 
 function statusLabel(status) {
     return OVERTIME_STATUSES[status]?.label || status;
