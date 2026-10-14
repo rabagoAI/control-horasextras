@@ -61,7 +61,7 @@ function initTheme() {
     const themeText = themeToggle.querySelector('span');
     
     // Verificar preferencia guardada o del sistema
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    const savedTheme = localStorage.getItem('theme') || 'dark';
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
     if (savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark)) {

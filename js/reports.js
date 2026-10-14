@@ -369,14 +369,7 @@ function createDepartmentChart() {
     if (emptyState) emptyState.style.display = 'none';
 
     // Colores vivos para departamentos con horas; gris apagado para los que no tienen (quedan en la leyenda)
-    const activeColors = [
-        'rgba(74, 111, 165, 0.7)',
-        'rgba(107, 142, 35, 0.7)',
-        'rgba(218, 165, 32, 0.7)',
-        'rgba(139, 69, 19, 0.7)',
-        'rgba(72, 61, 139, 0.7)',
-        'rgba(220, 53, 69, 0.7)'
-    ];
+    const activeColors = ['#3B82F6', '#F59E0B', '#A855F7', '#EF4444', '#14B8A6', '#10B981'];
     const isDark = document.body.classList.contains('dark-mode');
     const emptyColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
     const backgroundColor = departments.map((dep, i) =>
@@ -391,32 +384,26 @@ function createDepartmentChart() {
             datasets: [{
                 data: hours,
                 backgroundColor: backgroundColor,
-                borderColor: isDark ? '#2c3e50' : '#fff',
-                borderWidth: 2
+                borderColor: isDark ? '#0C0C0C' : '#FAFAFA',
+                borderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            cutout: '62%',
             plugins: {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: isDark ? '#E0E0E0' : '#333',
-                        padding: 20,
+                        color: isDark ? '#A1A1AA' : '#3F3F46',
+                        padding: 16,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
                         font: {
                             size: 12,
-                            weight: 'bold'
+                            weight: '500'
                         }
-                    }
-                },
-                title: {
-                    display: true,
-                    text: 'Horas Extras por Departamento',
-                    color: isDark ? '#E0E0E0' : '#333',
-                    font: {
-                        size: 16,
-                        weight: 'bold'
                     }
                 }
             }
@@ -471,9 +458,10 @@ function createMonthlyChart() {
             datasets: [{
                 label: 'Horas Extras',
                 data: hours,
-                borderColor: 'rgba(74, 111, 165, 1)',
-                backgroundColor: 'rgba(74, 111, 165, 0.1)',
-                borderWidth: 3,
+                borderColor: document.body.classList.contains('dark-mode') ? 'rgba(237, 237, 237, 0.85)' : 'rgba(74, 111, 165, 1)',
+                backgroundColor: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.07)' : 'rgba(74, 111, 165, 0.1)',
+                pointBackgroundColor: document.body.classList.contains('dark-mode') ? '#EDEDED' : 'rgba(74, 111, 165, 1)',
+                borderWidth: 2,
                 fill: true,
                 tension: 0.3
             }]
@@ -483,14 +471,12 @@ function createMonthlyChart() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    labels: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333'
-                    }
+                    display: false
                 },
                 title: {
-                    display: true,
+                    display: false,
                     text: 'Evolución de Horas Extras',
-                    color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                    color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46',
                     font: {
                         size: 16
                     }
@@ -503,7 +489,7 @@ function createMonthlyChart() {
                         color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333'
+                        color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46'
                     }
                 },
                 x: {
@@ -511,7 +497,7 @@ function createMonthlyChart() {
                         color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333'
+                        color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46'
                     }
                 }
             }
@@ -537,8 +523,8 @@ function createAmountChart() {
             datasets: [{
                 label: 'Importe (€)',
                 data: amounts,
-                backgroundColor: 'rgba(107, 142, 35, 0.7)',
-                borderColor: 'rgba(107, 142, 35, 1)',
+                backgroundColor: 'rgba(16, 185, 129, 0.75)', borderRadius: 4,
+                borderColor: 'rgba(16, 185, 129, 1)',
                 borderWidth: 1
             }]
         },
@@ -550,9 +536,9 @@ function createAmountChart() {
                     display: false
                 },
                 title: {
-                    display: true,
+                    display: false,
                     text: 'Importe Total por Mes',
-                    color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                    color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46',
                     font: {
                         size: 16
                     }
@@ -565,7 +551,7 @@ function createAmountChart() {
                         color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                        color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46',
                         callback: function(value) {
                             return '€' + value;
                         }
@@ -576,7 +562,7 @@ function createAmountChart() {
                         color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333'
+                        color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46'
                     }
                 }
             }
@@ -633,8 +619,8 @@ function createTopEmployeesChart() {
             datasets: [{
                 label: 'Importe Total (€)',
                 data: employeeAmounts,
-                backgroundColor: 'rgba(139, 69, 19, 0.7)',
-                borderColor: 'rgba(139, 69, 19, 1)',
+                backgroundColor: 'rgba(59, 130, 246, 0.75)', borderRadius: 4,
+                borderColor: 'rgba(59, 130, 246, 1)',
                 borderWidth: 1
             }]
         },
@@ -646,9 +632,9 @@ function createTopEmployeesChart() {
                     display: false
                 },
                 title: {
-                    display: true,
+                    display: false,
                     text: 'Top 5 Empleados por Importe Total',
-                    color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                    color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46',
                     font: {
                         size: 16
                     }
@@ -661,7 +647,7 @@ function createTopEmployeesChart() {
                         color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                        color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46',
                         callback: function(value) {
                             return '€' + value;
                         }
@@ -672,7 +658,7 @@ function createTopEmployeesChart() {
                         color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        color: document.body.classList.contains('dark-mode') ? '#E0E0E0' : '#333',
+                        color: document.body.classList.contains('dark-mode') ? '#A1A1AA' : '#3F3F46',
                         maxRotation: 45
                     }
                 }
